@@ -50,4 +50,4 @@ def update_total_episodes_single(ncode):
     # Commit the changes and close the connection
     conn.commit()
     conn.close()
-update_total_episodes()
+# update_total_episodes()

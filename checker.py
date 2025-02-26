@@ -9,6 +9,7 @@ from selenium import webdriver
 import requests
 import os
 from selenium.webdriver.chrome.service import Service
+from concurrent.futures import ThreadPoolExecutor
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 import random
@@ -101,6 +102,7 @@ def existence_check(ncode):
 def update_check(ncode, rating):
     if rating == 0:
         print(f"{ncode} is deleted by author")
+        return
     elif rating == 1:
         print(f"{ncode} is 18+")
         n_api_url = f"https://api.syosetu.com/novel18api/api/?of=t-w-ga-s-ua&ncode={ncode}&gzip=5&json"
@@ -150,9 +152,13 @@ def db_update():
     conn.commit()
     conn.close()
 
-    for n_code, rating in n_codes_ratings:
+    def process_n_code_rating(n_code_rating):
+        n_code, rating = n_code_rating
         print(f"Checking {n_code}...")
         update_check(n_code, rating)
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        executor.map(process_n_code_rating, n_codes_ratings)
 
     Thawing_gz()
     print("Thawing gz files...")
@@ -433,38 +439,48 @@ def single_episode(n_code, rating):
     print(title)
     return episode, title
 
-def new_episode(n_code,past_ep,general_all_no,rating):
+def new_episode(n_code, past_ep, general_all_no, rating):
     new_eps = []
     print(f"Checking {n_code}...")
     conn = sqlite3.connect('database/novel_status.db')
     cursor = conn.cursor()
     print("Connected to database")
+
     if general_all_no == 1:
-        episode, title = single_episode(n_code,rating)
-        new_eps.append([n_code,1,episode,title])
-    for i in range(general_all_no-past_ep):
-        episode, title = catch_up_episode(n_code, past_ep+i+1,rating)
-        new_eps.append([n_code,past_ep+i+1,episode,title])
-        if i % 20 == 0:
-            for ep in new_eps:
-                cursor.execute("""
-                    INSERT INTO episodes (ncode, episode_no, body, e_title)
-                    VALUES (?, ?, ?, ?)
-                """, (ep[0], ep[1], ep[2], ep[3]))
+        episode, title = single_episode(n_code, rating)
+        if episode and title:
+            new_eps.append([n_code, 1, episode, title])
+
+    for i in range(general_all_no - past_ep):
+        episode, title = catch_up_episode(n_code, past_ep + i + 1, rating)
+        if episode and title:
+            new_eps.append([n_code, past_ep + i + 1, episode, title])
+            if i % 20 == 0:
+                for ep in new_eps:
+                    cursor.execute("""
+                        INSERT INTO episodes (ncode, episode_no, body, e_title)
+                        VALUES (?, ?, ?, ?)
+                    """, (ep[0], ep[1], ep[2], ep[3]))
                 conn.commit()
                 new_eps = []
+
     for ep in new_eps:
         cursor.execute("""
-                    INSERT INTO episodes (ncode, episode_no, body, e_title)
-                    VALUES (?, ?, ?, ?)
-                """, (ep[0], ep[1], ep[2], ep[3]))
-        conn.commit()
-        new_eps = []
-    print(new_eps)
-
-
+            INSERT INTO episodes (ncode, episode_no, body, e_title)
+            VALUES (?, ?, ?, ?)
+        """, (ep[0], ep[1], ep[2], ep[3]))
     conn.commit()
+
+    # Update total_ep in novels_descs table
+    cursor.execute("""
+        UPDATE novels_descs
+        SET total_ep = ?
+        WHERE n_code = ?
+    """, (general_all_no, n_code))
+    conn.commit()
+
     conn.close()
+    print(f"Updated {n_code} with new episodes and total_ep.")
 
 def dell_dl():
     dl_dir = 'dl'
@@ -499,5 +515,3 @@ def existence_checker():
     print("All ratings have been updated.")
 
 # existence_checker()
-# dell_dl()
-# del_yml()

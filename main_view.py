@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 from PIL import ImageFont, Image, ImageDraw, ImageTk
 import tkinter.font as tkFont
 
-from checker import load_conf, db_update, shinchaku_checker, new_episode
+from checker import load_conf, db_update, shinchaku_checker, new_episode, dell_dl, del_yml
 from episode_count import update_total_episodes_single, update_total_episodes
 
 global scrollable_frame, scroll_canvas
@@ -286,6 +286,87 @@ def main():
         apply_button = ttk.Button(setting_frame, text="適用", command=apply_settings)
         apply_button.grid(row=3, column=0, columnspan=2, pady=10)
 
+
+    def show_input_screen():
+        input_window = tk.Toplevel()
+        input_window.title("入力画面")
+        input_window.geometry("500x300")
+
+        input_label = tk.Label(input_window, text="")
+        input_label.pack(pady=10)
+
+        input_text = tk.Text(input_window, height=10, width=50)
+        input_text.pack(pady=5)
+        #update--single--re_all
+        def send_input(event=None):
+            user_input = input_text.get("1.0", tk.END).strip()
+            print(f"User input: {user_input}")
+            if user_input == "exit":
+                root.quit()
+            elif "update" in user_input:
+                user_input = user_input.split("update")
+                if "--all" in user_input[1]:
+                    update_all_novels(main_shinchaku)
+                elif "--single" in user_input[1]:
+                    user_input = user_input[1].split("--single")
+                    if "--re_all" in user_input[1]:
+                        if "--n" in user_input[1]:
+                            ncode = user_input[1].split("--")[1].strip()
+                            episodes = episode_getter(ncode)
+                            for episode in episodes:
+                                new_episode(ncode, episode[0], episode[2], episode[3])
+                            update_total_episodes_single(ncode)
+                            print(f"All episodes for novel {ncode} have been re-fetched.")
+                            input_label.config(text=f"User input: {user_input}")
+                            input_text.delete("1.0", tk.END)
+                        else:
+                            print("Please provide an ncode to update.")
+                            input_label.config(text=f"User input: {user_input}")
+                            input_text.delete("1.0", tk.END)
+                    elif "--get_lost" in user_input[1]:
+                        if "--n" in user_input[1]:
+                            ncode = user_input[1].split("--")[1].strip()
+                            episodes = episode_getter(ncode)
+                            episode_numbers = [int(episode[0]) for episode in episodes]
+                            max_episode = max(episode_numbers)
+                            missing_episodes = [i for i in range(1, max_episode + 1) if i not in episode_numbers]
+                            for episode_no in missing_episodes:
+                                new_episode(ncode, episode_no, None, None)
+                            update_total_episodes_single(ncode)
+                            print(f"Missing episodes for novel {ncode} have been updated.")
+                            input_label.config(text=f"User input: {user_input}")
+                            input_text.delete("1.0", tk.END)
+
+                        else:
+                            print("Please provide an ncode to update.")
+                            input_label.config(text=f"User input: {user_input}")
+                            input_text.delete("1.0", tk.END)
+                    else:
+                        print("Invalid command.")
+                        input_label.config(text=f"User input: {user_input}")
+                        input_text.delete("1.0", tk.END)
+                else:
+                    print("Invalid command.")
+                    input_label.config(text=f"User input: {user_input}")
+                    input_text.delete("1.0", tk.END)
+            elif "n" in user_input:
+                ncode = user_input
+                input_label.config(text= "ncode:"+ncode +"title:"+main_sehelf[int(ncode)][1])
+            else:
+                input_label.config(text=f"User input: {user_input}")
+                input_text.delete("1.0", tk.END)
+
+
+
+        def exit_input():
+            input_window.destroy()
+
+        exit_button = tk.Button(input_window, text="終了", command=exit_input)
+        exit_button.pack(pady=10)
+        input_text.bind("<Return>", send_input)
+
+
+
     def show_updated_novels():
         global scrollable_frame, scroll_canvas
 
@@ -387,17 +468,19 @@ def main():
         current_row += 1
 
     # アプリの起動
+    root.bind('<Command-@>', lambda event: show_input_screen())
     root.mainloop()
-
 
     #
 
 # スクリプトが直接実行された場合にmain()を呼び出す
 if __name__ == "__main__":
+    dell_dl()
+    del_yml()
     main_sehelf = shelf_maker()
     last_read_novel,last_read_epno = get_last_read(main_sehelf)
     set_font, novel_fontsize, bg_color = load_conf()
     db_update()
     shinchaku_ep, main_shinchaku,shinchaku_novel = shinchaku_checker()
-    # update_all_novels_f(main_shinchaku)
+
     main()

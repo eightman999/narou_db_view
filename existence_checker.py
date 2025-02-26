@@ -8,7 +8,7 @@ from threading import Lock
 DB_PATH = 'database/novel_status.db'
 
 # 並列処理の設定
-MAX_WORKERS = 8
+MAX_WORKERS = 16
 
 # 書き込み用プールとロック
 write_pool = []
@@ -26,7 +26,7 @@ def update_rating(n_code):
     try:
         # 備考: 関数 existence_check を呼び出し rating を取得
         rating = existence_check(n_code)
-        return n_code, rating
+        return rating, n_code
     except Exception as e:
         print(f"Error processing n_code: {n_code}, Error: {str(e)}\n")
         return n_code, None  # エラー時は None を返す
@@ -37,14 +37,19 @@ def update_rating(n_code):
             print(f"Remaining updates: {nokori_update}\n")
 
 
+
 def main():
     global write_pool
     global nokori_update
 
-    # データベース接続を開始して全ての n_code を取得
+    # データベース接続を開始して条件に合う n_code を取得
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT n_code FROM novels_descs")
+    cursor.execute("""
+        SELECT n_code 
+        FROM novels_descs 
+        WHERE rating IS NULL OR LENGTH(rating) != 1 OR rating NOT GLOB '[0-9]'
+    """)
     n_codes = [row[0] for row in cursor.fetchall()]
     conn.close()
 
@@ -63,6 +68,33 @@ def main():
 
     # 全ての結果が収集されたら一括でデータベースに書き込む
     flush_write_pool()
+
+# def main():
+#     global write_pool
+#     global nokori_update
+#
+#     # データベース接続を開始して全ての n_code を取得
+#     conn = sqlite3.connect(DB_PATH)
+#     cursor = conn.cursor()
+#     cursor.execute("SELECT n_code FROM novels_descs")
+#     n_codes = [row[0] for row in cursor.fetchall()]
+#     conn.close()
+#
+#     # n_codesの数をグローバル変数nokori_updateに設定
+#     with nokori_update_lock:
+#         nokori_update = len(n_codes)
+#         print(f"Initial updates to process: {nokori_update}\n")
+#
+#     # ThreadPoolExecutor を使用して並列処理を実行
+#     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+#         results = list(executor.map(update_rating, n_codes))
+#
+#     # スレッドセーフにプールを更新
+#     with write_pool_lock:
+#         write_pool.extend([result for result in results if result[1] is not None])
+#
+#     # 全ての結果が収集されたら一括でデータベースに書き込む
+#     flush_write_pool()
 
 def flush_write_pool():
     """プールされているデータを一括でデータベースに書き込む"""
