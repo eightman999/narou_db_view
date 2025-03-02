@@ -1,4 +1,5 @@
 import asyncio
+import sys
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
 from bs4 import BeautifulSoup
@@ -17,6 +18,7 @@ from checker import load_conf, dell_dl, del_yml, USER_AGENTS
 from episode_count import update_total_episodes_single, update_total_episodes
 from async_ackground_executor import BackgroundExecutor
 from async_checker import NovelUpdater
+from main_view import episodes
 
 # ロギング設定
 logging.basicConfig(
@@ -32,6 +34,7 @@ logger = logging.getLogger("main_view")
 
 class NovelApp:
     def __init__(self, root):
+
         # メインウィンドウの設定
         self.root = root
         self.root.title("小説アプリ")
@@ -79,6 +82,28 @@ class NovelApp:
             messagebox.showerror("初期化エラー",
                                  f"小説更新機能の初期化に失敗しました：{e}\n\nアプリを再起動してください。")
         return self
+
+    # Pythonバージョン対応とタイムアウト関連のヘルパー関数を追加
+
+    import sys
+    import asyncio
+
+    # Pythonバージョン依存のタイムアウト処理を提供するヘルパー関数
+    async def safe_async_timeout(coroutine, timeout_seconds):
+        """
+        バージョン互換性のあるタイムアウト処理を提供する
+
+        Args:
+            coroutine: 実行する非同期コルーチン
+            timeout_seconds: タイムアウト秒数
+
+        Returns:
+            コルーチンの実行結果
+
+        Raises:
+            asyncio.TimeoutError: タイムアウト発生時
+        """
+        return await asyncio.wait_for(coroutine, timeout=timeout_seconds)
 
     def _initialize_ui(self):
         """UIコンポーネントの初期化"""
@@ -201,6 +226,33 @@ class NovelApp:
         for btn_text in option_buttons:
             self._create_button(self.content_frame, btn_text, current_row)
             current_row += 1
+
+    # NovelAppクラス内に進捗更新メソッドを追加
+
+    def _update_progress(self, current, total, message="更新中"):
+        """
+        進捗状況の更新
+
+        Args:
+            current: 現在の進捗
+            total: 全体の数
+            message: 表示メッセージ
+        """
+        # 進捗をパーセントで計算
+        progress = int((current / total) * 100) if total > 0 else 0
+
+        # GUIスレッドで実行するため、afterメソッドを使用
+        def update_ui():
+            # 最新の進捗状況をヘッダーラベルに表示
+            progress_text = f"{message} ({progress}%)"
+            self.header_label.config(text=progress_text)
+
+            # 新着情報表示も保持するため、処理完了時は元の情報を復元
+            if current >= total:
+                self.header_label.config(text=f"新着情報\n新着{self.shinchaku_novel}件,{self.shinchaku_ep}話")
+
+        # GUIスレッドで更新
+        self.root.after(0, update_ui)
 
     def _on_closing(self):
         """アプリ終了時の処理"""
@@ -343,6 +395,211 @@ class NovelApp:
         # キーボードショートカットをバインド
         episode_window.bind("<Right>", next_episode)
         episode_window.bind("<Left>", previous_episode)
+
+    async def initialize_episode_checker(self):
+        """
+        episodesテーブルのチェックと修復を行う
+        1. update_time列の追加
+        2. エピソードの連番チェック
+        3. 破損データのチェックと修復
+        """
+        # novel_updaterが初期化されていない場合はエラーを表示して終了
+        if self.novel_updater is None:
+            logger.error("小説更新機能が初期化されていません。エピソードチェックをスキップします。")
+            messagebox.showwarning(
+                "警告",
+                "小説更新機能が初期化されていないため、エピソードチェックをスキップします。\n"
+                "アプリ再起動後にも問題が続く場合は、管理者にお問い合わせください。"
+            )
+            return
+
+        try:
+            # データベース接続
+            conn = sqlite3.connect('database/novel_status.db')
+
+            # テキストではなくバイナリとして扱うよう設定
+            conn.text_factory = bytes
+            cursor = conn.cursor()
+
+            # update_time列の追加（なければ）
+            try:
+                cursor.execute("SELECT update_time FROM episodes LIMIT 1")
+            except sqlite3.OperationalError:
+                logger.info("update_time列を追加します")
+                cursor.execute("ALTER TABLE episodes ADD COLUMN update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+                conn.commit()
+
+            # すべてのncodeを取得
+            cursor.execute("SELECT DISTINCT ncode FROM episodes")
+            ncodes = [row[0].decode('utf-8', errors='replace') for row in cursor.fetchall()]
+
+            total_ncodes = len(ncodes)
+            if total_ncodes == 0:
+                logger.info("エピソードデータがありません")
+                conn.close()
+                return
+
+            logger.info(f"エピソードチェック: {total_ncodes}作品のチェックを開始します")
+
+            # 進捗表示初期化
+            self._update_progress(0, total_ncodes, "小説データの整合性チェック中...")
+
+            # 各ncodeに対して処理
+            for idx, ncode in enumerate(ncodes):
+                if hasattr(self, 'cancel_flag') and self.cancel_flag:
+                    break
+
+                # 進捗更新
+                self._update_progress(idx, total_ncodes, f"小説データチェック中: {ncode} ({idx + 1}/{total_ncodes})")
+
+                # rating情報を取得
+                cursor.execute("SELECT rating, general_all_no FROM novels_descs WHERE n_code = ?",
+                               (ncode.encode('utf-8'),))
+                novel_info = cursor.fetchone()
+
+                if not novel_info:
+                    logger.warning(f"{ncode}: 小説情報が見つかりません")
+                    continue
+
+                # バイナリデータをデコード
+                rating = int(novel_info[0]) if novel_info[0] is not None else None
+                general_all_no = int(novel_info[1]) if novel_info[1] is not None else None
+
+                # ratingが0, 4, 5の場合はスキップ
+                if rating in [0, 4, 5]:
+                    logger.info(f"{ncode}: rating={rating}のためスキップします")
+                    continue
+
+                if general_all_no is None:
+                    logger.warning(f"{ncode}: general_all_noが欠落しています")
+                    continue
+
+                # 進捗更新
+                self._update_progress(idx, total_ncodes, f"小説データチェック中: {ncode} ({idx + 1}/{total_ncodes})")
+
+                # rating情報を取得
+                cursor.execute("SELECT rating, general_all_no FROM novels_descs WHERE n_code = ?", (ncode,))
+                novel_info = cursor.fetchone()
+
+                if not novel_info:
+                    logger.warning(f"{ncode}: 小説情報が見つかりません")
+                    continue
+
+                rating, general_all_no = novel_info
+
+                if general_all_no is None:
+                    logger.warning(f"{ncode}: general_all_noが欠落しています")
+                    continue
+
+                # エピソード番号のリストを取得
+                cursor.execute("SELECT episode_no, e_title, body FROM episodes WHERE ncode = ? ORDER BY episode_no",
+                               (ncode,))
+                episodes = cursor.fetchall()
+
+                # 既存のエピソード番号セット
+                existing_ep_nos = set()
+                corrupted_eps = []
+
+                for ep_no, title, body in episodes:
+                    ep_no = int(ep_no)
+                    existing_ep_nos.add(ep_no)
+
+                    # タイトルや本文の破損チェック
+                    if not title or not body or len(title.strip()) == 0 or len(body.strip()) == 0:
+                        corrupted_eps.append(ep_no)
+                        logger.warning(f"{ncode} エピソード{ep_no}: タイトルまたは本文が破損しています")
+
+                # すべての期待されるエピソード番号
+                expected_ep_nos = set(range(1, general_all_no + 1))
+
+                # 欠落しているエピソード番号を特定
+                missing_ep_nos = expected_ep_nos - existing_ep_nos
+
+                # 重複しているエピソード番号を確認
+                cursor.execute("""
+                    SELECT episode_no, COUNT(*) as count 
+                    FROM episodes 
+                    WHERE ncode = ? 
+                    GROUP BY episode_no 
+                    HAVING count > 1
+                """, (ncode,))
+                duplicate_eps = [row[0] for row in cursor.fetchall()]
+
+                if duplicate_eps:
+                    logger.warning(f"{ncode}: 重複エピソード {duplicate_eps} を削除します")
+                    for ep_no in duplicate_eps:
+                        # 重複を削除して最新のものだけを残す
+                        cursor.execute("""
+                            DELETE FROM episodes 
+                            WHERE ncode = ? AND episode_no = ? AND rowid NOT IN (
+                                SELECT MAX(rowid) FROM episodes WHERE ncode = ? AND episode_no = ?
+                            )
+                        """, (ncode, ep_no, ncode, ep_no))
+
+                # 修復が必要なエピソードすべて（欠落 + 破損）
+                repair_eps = list(missing_ep_nos) + corrupted_eps
+
+                if repair_eps:
+                    logger.info(
+                        f"{ncode}: {len(repair_eps)}個のエピソードを修復します（欠落: {len(missing_ep_nos)}, 破損: {len(corrupted_eps)}）")
+
+                    # 非同期でエピソードを取得（最大10個まで一度に処理）
+                    max_repairs_at_once = 10
+                    for i in range(0, len(repair_eps), max_repairs_at_once):
+                        batch = repair_eps[i:i + max_repairs_at_once]
+
+                        # 各エピソードを再取得
+                        for ep_no in batch:
+                            # 進捗メッセージを更新
+                            self._update_progress(
+                                idx,
+                                total_ncodes,
+                                f"{ncode}: エピソード{ep_no}を再取得中... ({i + batch.index(ep_no) + 1}/{len(repair_eps)})"
+                            )
+
+                            # エピソードを再取得
+                            try:
+                                episode, title = await self.novel_updater.catch_up_episode(ncode, ep_no, rating)
+
+                                if episode and title:
+                                    # データベースを更新
+                                    cursor.execute("""
+                                        INSERT OR REPLACE INTO episodes (ncode, episode_no, body, e_title, update_time)
+                                        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                                    """, (ncode, ep_no, episode, title))
+                                    logger.info(f"{ncode} エピソード{ep_no}: 再取得成功")
+                                else:
+                                    logger.error(f"{ncode} エピソード{ep_no}: 再取得失敗")
+
+                            except Exception as e:
+                                logger.error(f"{ncode} エピソード{ep_no}の再取得中にエラー: {e}")
+
+                            # 一定の間隔をあけてアクセス
+                            await asyncio.sleep(1.0)
+
+                        # バッチごとにコミット
+                        conn.commit()
+                        logger.info(f"{ncode}: バッチ処理完了 ({i + len(batch)}/{len(repair_eps)})")
+
+                        # バッチ間でさらに時間をあける
+                        await asyncio.sleep(2.0)
+
+                # 定期的にコミット
+                if idx % 5 == 0:
+                    conn.commit()
+
+            # 最終コミット
+            conn.commit()
+            logger.info(f"エピソードチェック完了: {total_ncodes}作品")
+
+            # 進捗表示完了
+            self._update_progress(total_ncodes, total_ncodes, "小説データの整合性チェック完了")
+
+        except Exception as e:
+            logger.error(f"エピソードチェック中にエラー: {e}", exc_info=True)
+        finally:
+            if 'conn' in locals():
+                conn.close()
 
     def show_settings(self):
         """設定画面を表示"""
@@ -859,29 +1116,82 @@ class NovelApp:
 
 
 # アプリの起動関数
+# main_view_async.pyのstart_app関数を修正
+
+    # 初期化時にPythonバージョンをログに記録
+def log_python_version():
+    """Pythonバージョン情報をログに記録する"""
+    version_info = sys.version_info
+    logger.info(f"Running on Python {version_info.major}.{version_info.minor}.{version_info.micro}")
+
+    # asyncioのバージョン情報も記録
+    asyncio_version = getattr(asyncio, "__version__", "unknown")
+    logger.info(f"asyncio version: {asyncio_version}")
+
+    # Python 3.11未満ではasyncio.timeoutが利用できないことを警告
+    if version_info < (3, 11):
+        logger.warning("Python version < 3.11 detected. Using asyncio.wait_for for timeout handling.")
 async def start_app():
+    """アプリケーションを起動する非同期関数"""
     # 初期化処理
     dell_dl()
     del_yml()
+
+    # コマンドライン引数の処理
+    import argparse
+    parser = argparse.ArgumentParser(description='小説アプリ')
+    parser.add_argument('--no-verify-ssl', action='store_true', help='SSL証明書の検証を無効にする')
+    args = parser.parse_args()
+
+    # SSL検証設定をログに記録
+    if args.no_verify_ssl:
+        logger.warning("SSLの検証が無効になっています。これはセキュリティリスクとなる可能性があります。")
 
     # メインウィンドウを作成
     root = tk.Tk()
 
     # アプリを初期化
     app = NovelApp(root)
-    await app.initialize_async()
+
+    # 非同期小説更新クラスを初期化（SSL設定を渡す）
+    try:
+        # NovelUpdaterインスタンスを作成
+        novel_updater = NovelUpdater(verify_ssl=not args.no_verify_ssl)
+        # 初期化
+        app.novel_updater = await novel_updater.initialize()
+        logger.info("小説更新機能の初期化に成功しました")
+    except Exception as e:
+        logger.error(f"Failed to initialize novel updater: {e}")
+        messagebox.showerror("初期化エラー",
+                             f"小説更新機能の初期化に失敗しました：{e}\n\nアプリを再起動してください。")
+        app.novel_updater = None  # 明示的にNoneを設定
 
     # データを読み込み
     app.main_shelf = shelf_maker()
     app.last_read_novel, app.last_read_epno = get_last_read(app.main_shelf)
     app.set_font, app.novel_fontsize, app.bg_color = load_conf()
 
+    # エピソードデータの整合性チェック（新機能）
+    if app.novel_updater:  # novel_updaterが有効な場合のみ実行
+        try:
+            logger.info("エピソードデータの整合性チェックを開始します")
+            await app.initialize_episode_checker()
+        except Exception as e:
+            logger.error(f"エピソードデータチェック中にエラー: {e}")
+            messagebox.showwarning(
+                "警告",
+                "エピソードデータの整合性チェック中にエラーが発生しました。\n"
+                "アプリは起動しますが、一部のエピソードが正しく表示されない可能性があります。"
+            )
+
     # 新着情報を取得
     shinchaku_ep, main_shinchaku, shinchaku_novel = 0, [], 0
-    try:
-        shinchaku_ep, main_shinchaku, shinchaku_novel = await app.novel_updater.shinchaku_checker()
-    except Exception as e:
-        logger.error(f"Error checking updates: {e}")
+
+    if app.novel_updater:  # novel_updaterが有効な場合のみ実行
+        try:
+            shinchaku_ep, main_shinchaku, shinchaku_novel = await app.novel_updater.shinchaku_checker()
+        except Exception as e:
+            logger.error(f"新着チェック中にエラー: {e}")
 
     app.shinchaku_ep = shinchaku_ep
     app.main_shinchaku = main_shinchaku
@@ -895,8 +1205,6 @@ async def start_app():
         app.last_read_label.config(text=f"最後に開いていた小説\n{app.last_read_novel[1]} {app.last_read_epno}話")
 
     return app, root
-
-
 # メイン関数
 def main():
     # 非同期処理でアプリを起動

@@ -1,3 +1,5 @@
+# async_checker.pyの先頭に追加するインポート文
+
 import asyncio
 import aiohttp
 import random
@@ -6,11 +8,12 @@ import sqlite3
 import os
 import yaml
 import logging
+import sys
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from urllib.parse import urlparse
-
+import ssl
 # 元のchecker.pyからのインポート
 from checker import USER_AGENTS, load_conf
 
@@ -26,19 +29,78 @@ logging.basicConfig(
 logger = logging.getLogger("async_checker")
 
 
+# Pythonバージョン互換性のためのヘルパー関数
+def log_python_version():
+    """Pythonバージョン情報をログに記録する"""
+    version_info = sys.version_info
+    logger.info(f"Running on Python {version_info.major}.{version_info.minor}.{version_info.micro}")
+
+    # Python 3.11未満ではasyncio.timeoutが利用できないことを警告
+    if version_info < (3, 11):
+        logger.warning("Python version < 3.11 detected. Using asyncio.wait_for for timeout handling.")
+
+
+async def safe_async_timeout(coroutine, timeout_seconds):
+    """
+    バージョン互換性のあるタイムアウト処理を提供する
+
+    Args:
+        coroutine: 実行する非同期コルーチン
+        timeout_seconds: タイムアウト秒数
+
+    Returns:
+        コルーチンの実行結果
+
+    Raises:
+        asyncio.TimeoutError: タイムアウト発生時
+    """
+    return await asyncio.wait_for(coroutine, timeout=timeout_seconds)
 class NovelUpdater:
-    def __init__(self, db_path='database/novel_status.db'):
+    def __init__(self, db_path='database/novel_status.db', verify_ssl=False):
+        """
+            NovelUpdaterの初期化
+
+            Args:
+                db_path: データベースのパス
+                verify_ssl: SSLの検証を行うかどうか (True=検証する, False=検証しない)
+            """
         self.db_path = db_path
         self.session = None
         self.progress_callback = None
         self.cancel_flag = False
+        self.verify_ssl = verify_ssl
+
+        if not verify_ssl:
+            logger.warning("警告: SSL証明書の検証が無効になっています。これはセキュリティリスクとなる可能性があります。")
+
+        # Pythonバージョン情報を記録
+        log_python_version()
 
     async def initialize(self):
         """初期化処理とaiohttp sessionの作成"""
         # セッションのタイムアウト設定（総合的な待機時間）
-        # ClientSessionは初期化時にのみタイムアウトを設定する
         timeout = aiohttp.ClientTimeout(total=60, connect=30, sock_connect=30, sock_read=30)
-        self.session = aiohttp.ClientSession(timeout=timeout)
+
+        # SSL検証の設定
+        if not self.verify_ssl:
+            logger.warning("SSL証明書の検証を無効にしてセッションを作成します")
+            # TCPコネクタを作成し、verify_ssl=Falseを設定
+            connector = aiohttp.TCPConnector(verify_ssl=False)
+            self.session = aiohttp.ClientSession(timeout=timeout, connector=connector)
+        else:
+            # デフォルトの設定（SSL検証あり）
+            self.session = aiohttp.ClientSession(timeout=timeout)
+
+        # 接続テスト（タイムアウトエラーの診断に役立つ）
+        try:
+            test_url = "https://ncode.syosetu.com"
+            logger.info(f"接続テスト実行中: {test_url}")
+            async with self.session.get(test_url, allow_redirects=False) as response:
+                status = response.status
+                logger.info(f"接続テスト結果: ステータスコード {status}")
+        except Exception as e:
+            logger.warning(f"接続テストでエラーが発生しました: {e}")
+
         return self
 
     async def close(self):
@@ -73,11 +135,11 @@ class NovelUpdater:
 
         # まず通常の小説URLをチェック
         try:
-            # asyncio.wait_forを使用して全体のリクエストにタイムアウトを設定
-            async with asyncio.timeout(30):  # Python 3.11+ ではそのまま使用可能
-                async with self.session.get(n_url, headers=headers, allow_redirects=True) as response:
+            # asyncio.wait_forを使用
+            async with self.session.get(n_url, headers=headers, allow_redirects=True) as response:
+                try:
+                    text = await asyncio.wait_for(response.text(), timeout=30)
                     if response.status == 200:
-                        text = await response.text()
                         if "エラーが発生しました" in text:
                             rating = 4
                         elif "エラー" in text:
@@ -85,6 +147,8 @@ class NovelUpdater:
                         else:
                             rating = 2
                             return rating
+                except asyncio.TimeoutError:
+                    logger.warning(f"Timeout reading response for normal URL check for {ncode}")
         except asyncio.TimeoutError:
             logger.warning(f"Timeout checking normal URL for {ncode}")
         except Exception as e:
@@ -92,12 +156,14 @@ class NovelUpdater:
 
         # 18禁小説URLをチェック
         try:
-            async with asyncio.timeout(30):
-                async with self.session.get(n18_url, headers=headers, allow_redirects=False) as response:
+            async with self.session.get(n18_url, headers=headers, allow_redirects=False) as response:
+                try:
+                    text = await asyncio.wait_for(response.text(), timeout=30)
                     if response.status == 200:
-                        text = await response.text()
                         if "ageauth" not in text and "エラー" not in text:
                             rating = 1
+                except asyncio.TimeoutError:
+                    logger.warning(f"Timeout reading response for R18 URL check for {ncode}")
         except asyncio.TimeoutError:
             logger.warning(f"Timeout checking R18 URL for {ncode}")
         except Exception as e:
@@ -106,30 +172,43 @@ class NovelUpdater:
         logger.info(f"{ncode}'s rating: {rating}")
         return rating
 
+    # async_checker.pyのupdate_checkメソッドを修正
+
+    # update_checkメソッドのタイムアウト処理も修正
+
     async def update_check(self, ncode, rating):
         """小説情報の更新確認を非同期で行う"""
+        # ratingの値によってAPIリクエストをスキップ
         if rating == 0:
             logger.info(f"{ncode} is deleted by author")
             return None
+        elif rating == 4:
+            logger.info(f"{ncode} is deleted by author or author is deleted")
+            return None
+        elif rating == 5:
+            logger.info(f"{ncode} is skipped due to rating 5")
+            return None
+        # 通常の処理を続行
         elif rating == 1:
             logger.info(f"{ncode} is 18+")
             n_api_url = f"https://api.syosetu.com/novel18api/api/?of=t-w-ga-s-ua&ncode={ncode}&gzip=5&json"
         elif rating == 2:
             logger.info(f"{ncode} is normal")
             n_api_url = f"https://api.syosetu.com/novelapi/api/?of=t-w-ga-s-ua&ncode={ncode}&gzip=5&json"
-        elif rating == 4:
-            logger.info(f"{ncode} is deleted by author or author is deleted")
-            return None
         else:
             logger.error(f"Error: {ncode}'s rating is {rating}")
             return None
 
         try:
             headers = {'User-Agent': random.choice(USER_AGENTS)}
-            async with asyncio.timeout(30):
-                async with self.session.get(n_api_url, headers=headers) as response:
+
+            # asyncio.wait_forの代わりにasyncioの関数を使用
+            async with self.session.get(n_api_url, headers=headers) as response:
+                try:
+                    # レスポンスの読み取りにタイムアウトを設定
+                    content = await asyncio.wait_for(response.read(), timeout=30)
+
                     if response.status == 200:
-                        content = await response.read()
                         file_path = os.path.join('dl', f"{ncode}.gz")
                         os.makedirs('dl', exist_ok=True)
 
@@ -140,6 +219,9 @@ class NovelUpdater:
                     else:
                         logger.error(f"Failed to download file: {response.status}")
                         return None
+                except asyncio.TimeoutError:
+                    logger.warning(f"Timeout reading response for API data for {ncode}")
+                    return None
         except asyncio.TimeoutError:
             logger.warning(f"Timeout downloading API data for {ncode}")
             return None
@@ -147,8 +229,10 @@ class NovelUpdater:
             logger.error(f"Error updating {ncode}: {e}")
             return None
 
+    # async_checker.pyのcatch_up_episodeメソッドを修正
+
     async def catch_up_episode(self, ncode, episode_no, rating):
-        """エピソードを取得する非同期関数 - asyncio.timeoutを使用"""
+        """エピソードを取得する非同期関数 - バージョン互換性を考慮したタイムアウト処理"""
         title = ""
         episode = ""
 
@@ -164,12 +248,14 @@ class NovelUpdater:
 
         for attempt in range(max_retries):
             try:
-                # asyncio.timeoutを使用してタイムアウトを設定
-                async with asyncio.timeout(30):
-                    async with self.session.get(EP_url, headers=headers, allow_redirects=True) as response:
+                # asyncio.wait_forを使用して全体のリクエストにタイムアウトを設定（より互換性が高い）
+                async with self.session.get(EP_url, headers=headers, allow_redirects=True) as response:
+                    # レスポンスの読み取りにタイムアウトを設定
+                    try:
+                        response_text = await asyncio.wait_for(response.text(), timeout=30)
+
                         if response.status == 200:
-                            html = await response.text()
-                            soup = BeautifulSoup(html, 'html.parser')
+                            soup = BeautifulSoup(response_text, 'html.parser')
 
                             novel_body = soup.find('div', class_='p-novel__body')
                             title_tag = soup.find('h1', class_='p-novel__title')
@@ -184,9 +270,28 @@ class NovelUpdater:
                         else:
                             episode = f"Failed to retrieve the episode. Status code: {response.status}"
                             logger.error(f"Failed to get episode for {ncode} episode {episode_no}: {response.status}")
+                    except asyncio.TimeoutError:
+                        logger.warning(f"Timeout reading response for episode {episode_no} of {ncode}")
+                        episode = "Error: Response reading timeout"
+                        continue
 
                 # 成功したらループを抜ける
                 break
+
+            except (aiohttp.ClientConnectorError, aiohttp.ClientSSLError, ssl.SSLCertVerificationError) as e:
+                # SSL検証エラーの場合の特別なメッセージ
+                logger.error(
+                    f"Error fetching episode {episode_no} for {ncode} (attempt {attempt + 1}/{max_retries}): {e}")
+                if "CERTIFICATE_VERIFY_FAILED" in str(e) and self.verify_ssl:
+                    logger.warning(
+                        f"SSL証明書検証エラーが発生しました。--no-verify-ssl オプションの使用を検討してください。")
+
+                if attempt < max_retries - 1:
+                    # 再試行前に少し待機
+                    await asyncio.sleep(retry_delay)
+                else:
+                    episode = f"Error: Connection error after {max_retries} attempts"
+                    logger.error(f"Failed to fetch episode {episode_no} for {ncode} after {max_retries} attempts")
 
             except asyncio.TimeoutError:
                 logger.warning(
@@ -210,8 +315,10 @@ class NovelUpdater:
 
         return episode, title
 
+    # async_checker.pyのsingle_episodeメソッドも同様に修正
+
     async def single_episode(self, ncode, rating):
-        """単一エピソードの小説を取得する非同期関数 - asyncio.timeoutを使用"""
+        """単一エピソードの小説を取得する非同期関数 - バージョン互換性を考慮したタイムアウト処理"""
         EP_url = f"https://ncode.syosetu.com/{ncode}"
         if rating == 1:
             EP_url = f"https://novel18.syosetu.com/{ncode}"
@@ -224,12 +331,14 @@ class NovelUpdater:
 
         for attempt in range(max_retries):
             try:
-                # asyncio.timeoutを使用してタイムアウトを設定
-                async with asyncio.timeout(30):
-                    async with self.session.get(EP_url, headers=headers, allow_redirects=True) as response:
+                # asyncio.wait_forではなくセッションのタイムアウトに依存
+                async with self.session.get(EP_url, headers=headers, allow_redirects=True) as response:
+                    # レスポンスの読み取りにタイムアウトを設定
+                    try:
+                        response_text = await asyncio.wait_for(response.text(), timeout=30)
+
                         if response.status == 200:
-                            html = await response.text()
-                            soup = BeautifulSoup(html, 'html.parser')
+                            soup = BeautifulSoup(response_text, 'html.parser')
 
                             novel_body = soup.find('div', class_='p-novel__body')
                             title_tag = soup.find('h1', class_='p-novel__title')
@@ -252,6 +361,16 @@ class NovelUpdater:
                                 await asyncio.sleep(retry_delay)
                             else:
                                 return "", ""
+
+                    except asyncio.TimeoutError:
+                        logger.warning(f"Timeout reading response for single episode of {ncode}")
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(retry_delay)
+                        else:
+                            return "", ""
+
+                # 成功したらループを抜ける
+                break
 
             except asyncio.TimeoutError:
                 logger.warning(f"Timeout fetching single episode for {ncode} (attempt {attempt + 1}/{max_retries})")
@@ -276,6 +395,11 @@ class NovelUpdater:
     async def new_episode(self, ncode, past_ep, general_all_no, rating):
         """新しいエピソードを取得する非同期関数"""
         if self.cancel_flag:
+            return []
+
+        # general_all_noが欠落している場合のチェックを追加
+        if general_all_no is None:
+            logger.warning(f"Skipping {ncode}: general_all_noが欠落しています")
             return []
 
         new_eps = []
@@ -558,6 +682,11 @@ class NovelUpdater:
 
                 self._update_progress(i + 1, total, f"新着チェック中: {n_code}")
 
+                # ratingが0, 4, 5の場合はスキップ
+                if rating in [0, 4, 5]:
+                    logger.info(f"{n_code}: rating={rating}のためスキップします")
+                    continue
+
                 if total_ep is None:
                     total_ep = 0
                 if general_all_no is None:
@@ -592,6 +721,8 @@ class NovelUpdater:
         finally:
             conn.close()
 
+    # update_all_novelsメソッドを修正して、特定のratingをスキップ
+
     async def update_all_novels(self, shinchaku_novels):
         """すべての新着小説を更新する非同期関数"""
         if not shinchaku_novels:
@@ -611,14 +742,44 @@ class NovelUpdater:
         # 更新するノベルの最大数に制限を追加（大量更新を避ける）
         max_novels_to_update = min(30, total)
 
-        for i, row in enumerate(shinchaku_novels[:max_novels_to_update]):
+        # フィルタリングしたノベルのリストを作成
+        filtered_novels = []
+        for row in shinchaku_novels[:max_novels_to_update]:
+            n_code, title, past_ep, general_all_no, rating = row
+
+            # ratingが0, 4, 5の場合はスキップ
+            if rating in [0, 4, 5]:
+                logger.info(f"Skipping {n_code} ({title}) with rating {rating}")
+                continue
+
+            # general_all_noが欠落している場合もスキップ
+            if general_all_no is None:
+                logger.warning(f"Skipping {n_code}: Missing 'general_all_no'")
+                continue
+
+            filtered_novels.append(row)
+
+        # フィルタリング結果をログに出力
+        logger.info(
+            f"更新対象: {len(filtered_novels)}作品 (スキップ: {max_novels_to_update - len(filtered_novels)}作品)")
+
+        # フィルタリングされた小説がなければ早期リターン
+        if not filtered_novels:
+            return {
+                "shinchaku_ep": 0,
+                "main_shinchaku": [],
+                "shinchaku_novel": 0,
+                "updated_count": 0
+            }
+
+        for i, row in enumerate(filtered_novels):
             if self.cancel_flag:
                 break
 
             n_code, title, past_ep, general_all_no, rating = row
 
-            logger.info(f"Update novel {n_code} ({i + 1}/{max_novels_to_update}) (rating:{rating})")
-            self._update_progress(i, max_novels_to_update, f"更新中 ({i + 1}/{max_novels_to_update}): {title}")
+            logger.info(f"Update novel {n_code} ({i + 1}/{len(filtered_novels)}) (rating:{rating})")
+            self._update_progress(i, len(filtered_novels), f"更新中 ({i + 1}/{len(filtered_novels)}): {title}")
 
             try:
                 # エピソード数の差が大きすぎる場合は最新のみ取得
@@ -644,8 +805,8 @@ class NovelUpdater:
             # レート制限を回避するために待機
             await asyncio.sleep(1)
 
-        self._update_progress(total, total, f"更新完了: {updated}/{max_novels_to_update}の小説を更新しました")
-        logger.info(f"Updated {updated}/{max_novels_to_update} novels")
+        self._update_progress(total, total, f"更新完了: {updated}/{len(filtered_novels)}の小説を更新しました")
+        logger.info(f"Updated {updated}/{len(filtered_novels)} novels")
 
         # 新着情報を更新して返す
         try:
@@ -698,6 +859,8 @@ class NovelUpdater:
         finally:
             conn.close()
 
+    # db_updateメソッドも修正して、ratingが0, 4, 5の小説をスキップする
+
     async def db_update(self):
         """データベースの更新を行う非同期関数"""
         conn = sqlite3.connect(self.db_path)
@@ -712,11 +875,22 @@ class NovelUpdater:
                 logger.warning("No novels found in database")
                 return
 
-            # 性能向上のため、更新する小説の数を制限
-            max_novels_to_update = min(50, len(n_codes_ratings))
-            n_codes_ratings = n_codes_ratings[:max_novels_to_update]
+            # 特定のratingの小説をフィルタリング
+            filtered_novels = []
+            for n_code, rating in n_codes_ratings:
+                if rating in [0, 4, 5]:
+                    logger.info(f"Skipping {n_code} with rating {rating}")
+                    continue
+                filtered_novels.append((n_code, rating))
 
-            total = len(n_codes_ratings)
+            logger.info(
+                f"更新対象: {len(filtered_novels)}作品 (スキップ: {len(n_codes_ratings) - len(filtered_novels)}作品)")
+
+            # 性能向上のため、更新する小説の数を制限
+            max_novels_to_update = min(50, len(filtered_novels))
+            filtered_novels = filtered_novels[:max_novels_to_update]
+
+            total = len(filtered_novels)
             completed = 0
             self._update_progress(completed, total, "小説情報を更新中...")
 
@@ -729,7 +903,7 @@ class NovelUpdater:
                 if self.cancel_flag:
                     break
 
-                batch = n_codes_ratings[i:i + batch_size]
+                batch = filtered_novels[i:i + batch_size]
                 tasks = [self.update_check(n_code, rating) for n_code, rating in batch]
                 results = await asyncio.gather(*tasks)
                 completed += len(batch)
@@ -744,7 +918,7 @@ class NovelUpdater:
 
             # YMLファイルを解析してDBを更新
             self._update_progress(0, 100, "小説情報をDBに更新中...")
-            await self.yml_parse_time(n_codes_ratings)
+            await self.yml_parse_time(filtered_novels)
 
             logger.info("Database updated successfully")
             return True
