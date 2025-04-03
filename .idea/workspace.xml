@@ -5,13 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="bad1a08a-9700-4753-8d26-2a6749864910" name="変更" comment="っっl">
-      <change afterPath="$PROJECT_DIR$/.idea/dataSources.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/encodings.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dbnavigator.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dbnavigator.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/async_bookshelf.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/async_episode_count.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/async_recover_novels.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/async_checker.py" beforeDir="false" afterPath="$PROJECT_DIR$/async_checker.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/background_tasks.log" beforeDir="false" afterPath="$PROJECT_DIR$/background_tasks.log" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/first_last_update.py" beforeDir="false" afterPath="$PROJECT_DIR$/first_last_update.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main_view_async.py" beforeDir="false" afterPath="$PROJECT_DIR$/main_view_async.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -78,7 +75,8 @@
     "RunOnceActivity.git.unshallow": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "dart.analysis.tool.window.visible": "false",
-    "git-widget-placeholder": "master",
+    "git-widget-placeholder": "AI__Hidouki",
+    "ignore.virus.scanning.warn.message": "true",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "D:/趣味/data analyzer",
     "node.js.detected.package.eslint": "true",
@@ -271,6 +269,7 @@
       <workItem from="1740796428880" duration="1550000" />
       <workItem from="1740826495002" duration="23000" />
       <workItem from="1740869501316" duration="11797000" />
+      <workItem from="1743680616272" duration="964000" />
     </task>
     <task id="LOCAL-00001" summary="っっl">
       <option name="closed" value="true" />

@@ -1,24 +1,21 @@
 import asyncio
-import sys
-import tkinter as tk
-from tkinter import ttk, scrolledtext, messagebox
-from bs4 import BeautifulSoup
-import sqlite3
-import os
 import configparser
 import threading
-import time
-import logging
+import tkinter as tk
+from dbm import sqlite3
+from tkinter import ttk, scrolledtext
+from bs4 import BeautifulSoup
 from PIL import ImageFont, Image, ImageDraw, ImageTk
 import tkinter.font as tkFont
+import logging
+import sys
 
-# 自作モジュールのインポート
-from bookshelf import shelf_maker, get_last_read, episode_getter, input_last_read
-from checker import load_conf, dell_dl, del_yml, USER_AGENTS
-from episode_count import update_total_episodes_single, update_total_episodes
-from async_ackground_executor import BackgroundExecutor
+# 自作モジュールのインポート（非同期版に置き換える）
+from async_bookshelf import shelf_maker, get_last_read, episode_getter, input_last_read
 from async_checker import NovelUpdater
-from main_view import episodes
+from async_episode_count import update_total_episodes_single, update_total_episodes
+from async_ackground_executor import BackgroundExecutor
+from checker import load_conf, dell_dl, del_yml, USER_AGENTS
 
 # ロギング設定
 logging.basicConfig(
@@ -31,637 +28,369 @@ logging.basicConfig(
 )
 logger = logging.getLogger("main_view")
 
+# グローバル変数
+global scrollable_frame, scroll_canvas
+main_shelf = []
+last_read_novel = []
+episodes = []
+last_read_epno = 0
+novel_fontsize = 14
+set_font = "YuKyokasho Yoko"
+bg_color = "#FFFFFF"
+shinchaku_ep = 0
+shinchaku_novel = 0
+main_shinchaku = []
 
-class NovelApp:
+
+# メインクラス
+class AsyncApp:
     def __init__(self, root):
-
-        # メインウィンドウの設定
         self.root = root
-        self.root.title("小説アプリ")
-        self.root.attributes("-fullscreen", True)
-        self.root.configure(bg="#0080A0")
+        self.running = True
+        self.loop = asyncio.get_event_loop()
 
-        # インスタンス変数の初期化
-        self.main_shelf = []
-        self.last_read_novel = []
-        self.episodes = []
-        self.last_read_epno = 0
-        self.novel_fontsize = 14
-        self.set_font = "YuKyokasho Yoko"
-        self.bg_color = "#FFFFFF"
-        self.shinchaku_ep = 0
-        self.shinchaku_novel = 0
-        self.main_shinchaku = []
+        # BackgroundExecutorを初期化
+        self.executor = BackgroundExecutor(root)
 
-        # スクロール可能なフレームの設定
-        self.scroll_canvas = None
-        self.scrollable_frame = None
-
-        # バックグラウンドエグゼキューター
-        self.executor = BackgroundExecutor(self.root)
-
-        # 非同期小説更新クラス
+        # NovelUpdaterの初期化（後で非同期で行う）
         self.novel_updater = None
 
-        # UIの初期化
-        self._initialize_ui()
+    async def initialize(self):
+        """アプリケーションの初期化を非同期で行う"""
+        global main_shelf, last_read_novel, last_read_epno, set_font, novel_fontsize, bg_color, shinchaku_ep, main_shinchaku, shinchaku_novel
 
-        # ショートカットキーの設定
-        self.root.bind('<Command-@>', lambda event: self.show_input_screen())
+        # 初期化処理
+        dell_dl()
+        del_yml()
 
-        # アプリ終了時の処理
-        self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
+        # 小説データの読み込み
+        main_shelf = await shelf_maker()
+        last_read_novel, last_read_epno = await get_last_read(main_shelf)
+        set_font, novel_fontsize, bg_color = load_conf()
 
-    async def initialize_async(self):
-        """非同期初期化処理を行う"""
-        # 非同期小説更新クラスを初期化
+        # NovelUpdaterの初期化
         try:
             self.novel_updater = await NovelUpdater().initialize()
+            logger.info("小説更新機能の初期化に成功しました")
         except Exception as e:
             logger.error(f"Failed to initialize novel updater: {e}")
-            messagebox.showerror("初期化エラー",
-                                 f"小説更新機能の初期化に失敗しました：{e}\n\nアプリを再起動してください。")
+            tk.messagebox.showerror("初期化エラー",
+                                    f"小説更新機能の初期化に失敗しました：{e}\n\nアプリを再起動してください。")
+            self.novel_updater = None
+
+        # 新着情報の取得
+        if self.novel_updater:
+            try:
+                shinchaku_ep, main_shinchaku, shinchaku_novel = await self.novel_updater.shinchaku_checker()
+            except Exception as e:
+                logger.error(f"新着チェック中にエラー: {e}")
+
         return self
 
-    # Pythonバージョン対応とタイムアウト関連のヘルパー関数を追加
+    def run_async(self, coro):
+        """非同期コルーチンをGUIスレッドから実行する"""
+        if asyncio.iscoroutine(coro):
+            return asyncio.run_coroutine_threadsafe(coro, self.loop)
+        else:
+            return coro
 
-    import sys
-    import asyncio
 
-    # Pythonバージョン依存のタイムアウト処理を提供するヘルパー関数
-    async def safe_async_timeout(coroutine, timeout_seconds):
-        """
-        バージョン互換性のあるタイムアウト処理を提供する
+# メインウィンドウのセットアップ
+async def main():
+    # メインウィンドウの設定
+    root = tk.Tk()
+    root.title("小説アプリ")
+    root.attributes("-fullscreen", True)  # フルスクリーンモード
+    root.configure(bg="#0080A0")  # 背景色を変更
 
-        Args:
-            coroutine: 実行する非同期コルーチン
-            timeout_seconds: タイムアウト秒数
+    # アプリケーションの初期化
+    app = AsyncApp(root)
+    await app.initialize()
 
-        Returns:
-            コルーチンの実行結果
+    # ボタンの幅と高さ
+    BUTTON_WIDTH = 25
+    BUTTON_FONT = ("Helvetica", 18)
 
-        Raises:
-            asyncio.TimeoutError: タイムアウト発生時
-        """
-        return await asyncio.wait_for(coroutine, timeout=timeout_seconds)
+    # ヘッダー部分
+    header_frame = tk.Frame(root, bg="#0080A0")
+    header_frame.grid(row=0, column=0, columnspan=2, sticky="ew")  # ヘッダーを上部に配置
 
-    def _initialize_ui(self):
-        """UIコンポーネントの初期化"""
-        # ボタンのスタイル設定
-        self.BUTTON_WIDTH = 25
-        self.BUTTON_FONT = ("Helvetica", 18)
+    header_label = tk.Label(
+        header_frame,
+        text=f"新着情報\n新着{shinchaku_novel}件,{shinchaku_ep}話",
+        bg="#0080A0",
+        fg="white",
+        font=("Helvetica", 24),
+        anchor="w",
+        justify="left",
+    )
+    header_label.pack(side="left", padx=30, pady=10)  # 左端から十分な余白
 
-        # ヘッダーフレーム
-        self.header_frame = tk.Frame(self.root, bg="#0080A0")
-        self.header_frame.grid(row=0, column=0, columnspan=2, sticky="ew")
+    last_read_title = f"{last_read_novel[1]} {last_read_epno}話" if last_read_novel else "なし"
+    last_read_label = tk.Label(
+        header_frame,
+        text=f"最後に開いていた小説\n{last_read_title}",
+        bg="#0080A0",
+        fg="white",
+        font=("Helvetica", 24),
+        anchor="e",
+        justify="right",
+    )
+    last_read_label.pack(side="right", padx=30, pady=10)  # 右端から十分な余白
 
-        # 新着情報ラベル
-        self.header_label = tk.Label(
-            self.header_frame,
-            text=f"新着情報\n新着{self.shinchaku_novel}件,{self.shinchaku_ep}話",
-            bg="#0080A0",
-            fg="white",
-            font=("Helvetica", 24),
-            anchor="w",
-            justify="left",
-        )
-        self.header_label.pack(side="left", padx=30, pady=10)
-
-        # 最後に読んだ小説のラベル
-        last_read_title = f"{self.last_read_novel[1]} {self.last_read_epno}話" if self.last_read_novel else "なし"
-        self.last_read_label = tk.Label(
-            self.header_frame,
-            text=f"最後に開いていた小説\n{last_read_title}",
-            bg="#0080A0",
-            fg="white",
-            font=("Helvetica", 24),
-            anchor="e",
-            justify="right",
-        )
-        self.last_read_label.pack(side="right", padx=30, pady=10)
-
-        # コンテンツフレーム（左側）
-        self.content_frame = tk.Frame(self.root, bg="#F0F0F0")
-        self.content_frame.grid(row=1, column=0, sticky="nsew")
-
-        # リストフレーム（右側）
-        self.list_frame = tk.Frame(self.root, bg="#F0F0F0")
-        self.list_frame.grid(row=1, column=1, sticky="nsew")
-
-        # スクロールキャンバスを初期化
-        self._initialize_scroll_frame()
-
-        # グリッドの行列調整
-        self.root.grid_rowconfigure(1, weight=1)
-        self.root.grid_columnconfigure(0, weight=1)
-        self.root.grid_columnconfigure(1, weight=2)  # 小説一覧部分を広くする
-
-        # メニューボタンの作成
-        self._create_menu_buttons()
-
-    def _initialize_scroll_frame(self):
-        """スクロール可能なフレームを初期化"""
-        self.scroll_canvas = tk.Canvas(self.list_frame, bg="#F0F0F0")
-        self.scrollbar = ttk.Scrollbar(self.list_frame, orient="vertical", command=self.scroll_canvas.yview)
-        self.scrollable_frame = ttk.Frame(self.scroll_canvas)
-
-        self.scrollable_frame.bind(
-            "<Configure>",
-            lambda e: self.scroll_canvas.configure(scrollregion=self.scroll_canvas.bbox("all"))
-        )
-
-        self.scroll_canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-        self.scroll_canvas.configure(yscrollcommand=self.scrollbar.set)
-
-        self.scroll_canvas.pack(side="left", fill="both", expand=True)
-        self.scrollbar.pack(side="right", fill="y")
-
-    def _create_section_title(self, parent, text, row):
-        """セクションタイトルを作成"""
-        title = tk.Label(parent, text=text, font=self.BUTTON_FONT, bg="#0080A0", fg="white", anchor="w")
+    # セクションタイトルを作成する関数
+    def create_section_title(parent, text, row):
+        title = tk.Label(parent, text=text, font=BUTTON_FONT, bg="#0080A0", fg="white", anchor="w")
         title.grid(row=row, column=0, sticky="w", pady=(10, 0), padx=20)
 
-    def _create_button(self, parent, text, row, command=None):
-        """ボタンを作成"""
+    # ボタンを作成する関数
+    def create_button(parent, text, row, command=None):
         if isinstance(text, tuple):
             text, command = text
-        btn = ttk.Button(parent, text=text, width=self.BUTTON_WIDTH, command=command)
+        btn = ttk.Button(parent, text=text, width=BUTTON_WIDTH, command=command)
         btn.grid(row=row, column=0, padx=20, pady=5, sticky="w")
 
-    def _create_menu_buttons(self):
-        """メニューボタンを作成"""
-        current_row = 0
+    # コンテンツ部分
+    content_frame = tk.Frame(root, bg="#F0F0F0")
+    content_frame.grid(row=1, column=0, sticky="nsew")
 
-        # 「小説をさがす」セクション
-        self._create_section_title(self.content_frame, "小説をさがす", current_row)
-        current_row += 1
-        search_buttons = ["ランキング", "キーワード検索", "詳細検索", "ノクターノベルズ", "ムーンライトノベルズ",
-                          "PickUp!"]
-        for btn_text in search_buttons:
-            self._create_button(self.content_frame, btn_text, current_row)
-            current_row += 1
+    # 小説一覧の表示部分
+    list_frame = tk.Frame(root, bg="#F0F0F0")
+    list_frame.grid(row=1, column=1, sticky="nsew")
 
-        # 「小説を読む」セクション
-        self._create_section_title(self.content_frame, "小説を読む", current_row)
-        current_row += 1
-        read_buttons = [
-            ("小説一覧", self.show_novel_list),
-            ("最近更新された小説", self.show_updated_novels),
-            ("最近読んだ小説", None),
-            ("作者別・シリーズ別", None),
-            ("タグ検索", None),
-        ]
-        for btn_text, command in read_buttons:
-            self._create_button(self.content_frame, btn_text, current_row, command=command)
-            current_row += 1
+    scroll_canvas = tk.Canvas(list_frame, bg="#F0F0F0")
+    scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=scroll_canvas.yview)
+    scrollable_frame = ttk.Frame(scroll_canvas)
 
-        # 「オプション」セクション
-        self._create_section_title(self.content_frame, "オプション", current_row)
-        current_row += 1
-        option_buttons = [
-            ("ダウンロード状況", None),
-            ("設定", self.show_settings),
-            ("更新チェック", self.check_updates)
-        ]
-        for btn_text in option_buttons:
-            self._create_button(self.content_frame, btn_text, current_row)
-            current_row += 1
+    scrollable_frame.bind(
+        "<Configure>",
+        lambda e: scroll_canvas.configure(scrollregion=scroll_canvas.bbox("all"))
+    )
 
-    # NovelAppクラス内に進捗更新メソッドを追加
+    scroll_canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+    scroll_canvas.configure(yscrollcommand=scrollbar.set)
 
-    def _update_progress(self, current, total, message="更新中"):
-        """
-        進捗状況の更新
+    scroll_canvas.pack(side="left", fill="both", expand=True)
+    scrollbar.pack(side="right", fill="y")
 
-        Args:
-            current: 現在の進捗
-            total: 全体の数
-            message: 表示メッセージ
-        """
-        # 進捗をパーセントで計算
-        progress = int((current / total) * 100) if total > 0 else 0
+    # グリッドの行列調整
+    root.grid_rowconfigure(1, weight=1)
+    root.grid_columnconfigure(0, weight=1)
+    root.grid_columnconfigure(1, weight=2)  # 小説一覧部分を広くする
 
-        # GUIスレッドで実行するため、afterメソッドを使用
-        def update_ui():
-            # 最新の進捗状況をヘッダーラベルに表示
-            progress_text = f"{message} ({progress}%)"
-            self.header_label.config(text=progress_text)
+    # 小説リストを表示する関数
+    async def show_novel_list():
+        global scrollable_frame, scroll_canvas
 
-            # 新着情報表示も保持するため、処理完了時は元の情報を復元
-            if current >= total:
-                self.header_label.config(text=f"新着情報\n新着{self.shinchaku_novel}件,{self.shinchaku_ep}話")
-
-        # GUIスレッドで更新
-        self.root.after(0, update_ui)
-
-    def _on_closing(self):
-        """アプリ終了時の処理"""
-        # 非同期処理のクリーンアップ
-        self.executor.shutdown()
-
-        # 非同期小説更新クラスのクリーンアップ
-        if self.novel_updater:
-            asyncio.run(self.novel_updater.close())
-
-        # アプリを終了
-        self.root.destroy()
-
-    def _refresh_scroll_frame(self):
-        """スクロール可能なフレームを再初期化"""
-        # 既存のウィジェットをクリア
-        for widget in self.list_frame.winfo_children():
+        # Clear the existing widgets in the list_frame
+        for widget in list_frame.winfo_children():
             widget.destroy()
 
-        # スクロールフレームを再初期化
-        self._initialize_scroll_frame()
+        # Initialize the canvas and scrollable frame
+        scroll_canvas = tk.Canvas(list_frame, bg="#F0F0F0")
+        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=scroll_canvas.yview)
+        scrollable_frame = ttk.Frame(scroll_canvas)
 
-    def show_novel_list(self):
-        """小説一覧を表示"""
-        self._refresh_scroll_frame()
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: scroll_canvas.configure(scrollregion=scroll_canvas.bbox("all"))
+        )
 
-        # データ準備
+        scroll_canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        scroll_canvas.configure(yscrollcommand=scrollbar.set)
+
+        scroll_canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Prepare the data structure
         buttons_data = [
             {"title": f"読む", "text": f"{row[1]} - 作者: {row[2]}", "n_code": row[0]}
-            for row in self.main_shelf
+            for row in main_shelf
         ]
 
-        # ボタン作成
+        # Draw all buttons
         for data in buttons_data:
-            frame = tk.Frame(self.scrollable_frame, bg="#F0F0F0")
+            frame = tk.Frame(scrollable_frame, bg="#F0F0F0")
             frame.pack(fill="x", pady=2)
 
-            # タイトルラベル
+            # Title label
             title_label = tk.Label(frame, text=data["text"], bg="#F0F0F0", anchor="w")
             title_label.pack(side="left", padx=5, fill="x", expand=True)
 
-            # クリックイベントをバインド
-            title_label.bind("<Button-1>", lambda e, n_code=data["n_code"]: self.on_title_click(e, n_code))
+            # Bind click event to the label
+            title_label.bind("<Button-1>", lambda e, n_code=data["n_code"]: on_title_click(e, n_code))
 
-    def on_title_click(self, event, n_code):
-        """小説タイトルをクリックしたときの処理"""
-        self.episodes = episode_getter(n_code)
-        self.show_episode_list(self.episodes, n_code)
+    # タイトルクリック時の処理 - 非同期化のために関数を定義
+    def on_title_click(event, n_code):
+        # 非同期関数をバックグラウンドで実行
+        app.executor.run_in_background(
+            lambda progress_callback: handle_title_click(n_code, progress_callback),
+            on_complete=lambda result: show_episode_list(result, n_code)
+        )
 
-    def show_episode_list(self, episodes, ncode):
-        """エピソード一覧を表示"""
-        # スクロール位置をリセット
-        self.scroll_canvas.yview_moveto(0)
+    # タイトルクリックの非同期処理
+    async def handle_title_click(n_code, progress_callback):
+        progress_callback(0, f"エピソード情報を取得中...")
+        episodes = await episode_getter(n_code)
+        progress_callback(100, "完了")
+        return episodes
 
-        # エピソードを番号順にソート
+    # エピソード一覧を表示
+    def show_episode_list(episodes_data, ncode):
+        global scrollable_frame, scroll_canvas, episodes
+
+        # エピソードをグローバル変数に格納
+        episodes = episodes_data
+
+        # Sort the episodes by episode_no (episode[0])
+        scroll_canvas.yview_moveto(0)
         episodes.sort(key=lambda episode: int(episode[0]))
 
-        # 既存のウィジェットをクリア
-        for widget in self.scrollable_frame.winfo_children():
+        # Clear the existing widgets in the scrollable_frame
+        for widget in scrollable_frame.winfo_children():
             widget.destroy()
 
-        # エピソード一覧を表示
+        # Create frames and labels to display the episodes
         for episode in episodes:
-            frame = tk.Frame(self.scrollable_frame, bg="#F0F0F0")
+            frame = tk.Frame(scrollable_frame, bg="#F0F0F0")
             frame.pack(fill="x", pady=2)
 
-            # エピソードラベル
-            episode_label = tk.Label(
-                frame,
-                text=f"Episode {episode[0]}: {episode[1]}",
-                bg="#F0F0F0",
-                anchor="w"
-            )
+            # Episode label
+            episode_label = tk.Label(frame, text=f"Episode {episode[0]}: {episode[1]}", bg="#F0F0F0", anchor="w")
             episode_label.pack(side="left", padx=5, fill="x", expand=True)
 
-            # クリックイベントをバインド
-            episode_label.bind("<Button-1>", lambda e, ep=episode: self.on_episode_click(e, ep, ncode))
+            # Bind click event to the label
+            episode_label.bind("<Button-1>", lambda e, ep=episode: on_episode_click(e, ep, ncode))
 
-    def on_episode_click(self, event, episode, n_code):
-        """エピソードをクリックしたときの処理"""
-        # エピソードウィンドウを作成
-        episode_window = tk.Toplevel(self.root)
-        episode_window.title(f"Episode {episode[0]}: {episode[1]}")
-        episode_window.geometry("800x600")
+        # Create a scrollbar for the episode list
+        scrollbar = ttk.Scrollbar(scrollable_frame, orient="vertical", command=scroll_canvas.yview)
+        scrollbar.pack(side="right", fill="y")
 
-        # 最後に読んだ小説を記録
-        input_last_read(n_code, episode[0])
+        # Configure the scrollbar
+        scroll_canvas.config(yscrollcommand=scrollbar.set)
 
-        # スクロールテキストウィジェットを作成
-        scrolled_text = scrolledtext.ScrolledText(
-            episode_window,
-            wrap=tk.WORD,
-            font=(self.set_font, self.novel_fontsize)
-        )
-        scrolled_text.pack(fill=tk.BOTH, expand=True)
+    # エピソードクリック時の処理
+    def on_episode_click(event, episode, n_code):
+        # 非同期で最後に読んだ小説を記録
+        asyncio.run_coroutine_threadsafe(input_last_read(n_code, episode[0]), app.loop)
 
-        # エピソード内容を表示する関数
         def show_episode(episode):
+            # Clear the existing content
             scrolled_text.config(state=tk.NORMAL)
             scrolled_text.delete(1.0, tk.END)
 
-            # HTMLコンテンツを解析
+            # Parse the HTML content
             soup = BeautifulSoup(episode[2], "html.parser")
 
-            # 空の段落を削除
+            # Remove empty paragraphs
             for p in soup.find_all('p'):
                 if not p.get_text(strip=True) and not p.attrs:
                     p.decompose()
 
-            # テキストコンテンツを抽出
+            # Extract the cleaned text content
             text_content = soup.get_text()
 
-            # テキストを挿入
+            # Insert the text content into the scrolled text widget
             scrolled_text.insert(tk.END, text_content)
-            scrolled_text.config(state=tk.DISABLED, bg=self.bg_color)
+            scrolled_text.config(state=tk.DISABLED, bg=bg_color)
 
-        # 次のエピソードに移動する関数
         def next_episode(event):
             nonlocal episode
             current_index = episodes.index(episode)
             if current_index < len(episodes) - 1:
                 episode = episodes[current_index + 1]
                 show_episode(episode)
-                input_last_read(n_code, episode[0])
-                episode_window.title(f"Episode {episode[0]}: {episode[1]}")
+                # 非同期で最後に読んだ小説を記録
+                asyncio.run_coroutine_threadsafe(input_last_read(n_code, episode[0]), app.loop)
+            episode_window.title(f"Episode {episode[0]}: {episode[1]}")
 
-        # 前のエピソードに移動する関数
         def previous_episode(event):
             nonlocal episode
             current_index = episodes.index(episode)
             if current_index > 0:
                 episode = episodes[current_index - 1]
                 show_episode(episode)
-                input_last_read(n_code, episode[0])
-                episode_window.title(f"Episode {episode[0]}: {episode[1]}")
+                # 非同期で最後に読んだ小説を記録
+                asyncio.run_coroutine_threadsafe(input_last_read(n_code, episode[0]), app.loop)
+            episode_window.title(f"Episode {episode[0]}: {episode[1]}")
 
-        # 初期エピソード内容を表示
+        # Create a new window to display the episode content
+        episode_window = tk.Toplevel()
+        episode_window.title(f"Episode {episode[0]}: {episode[1]}")
+        episode_window.geometry("800x600")
+
+        # Create a scrolled text widget to display the episode content
+        scrolled_text = scrolledtext.ScrolledText(episode_window, wrap=tk.WORD, font=(set_font, novel_fontsize))
+        scrolled_text.pack(fill=tk.BOTH, expand=True)
+
+        # Show the initial episode content
         show_episode(episode)
 
-        # キーボードショートカットをバインド
+        # Bind the left and right arrow keys to navigate episodes
         episode_window.bind("<Right>", next_episode)
         episode_window.bind("<Left>", previous_episode)
 
-    async def initialize_episode_checker(self):
-        """
-        episodesテーブルのチェックと修復を行う
-        1. update_time列の追加
-        2. エピソードの連番チェック
-        3. 破損データのチェックと修復
-        """
-        # novel_updaterが初期化されていない場合はエラーを表示して終了
-        if self.novel_updater is None:
-            logger.error("小説更新機能が初期化されていません。エピソードチェックをスキップします。")
-            messagebox.showwarning(
-                "警告",
-                "小説更新機能が初期化されていないため、エピソードチェックをスキップします。\n"
-                "アプリ再起動後にも問題が続く場合は、管理者にお問い合わせください。"
-            )
-            return
-
-        try:
-            # データベース接続
-            conn = sqlite3.connect('database/novel_status.db')
-
-            # テキストではなくバイナリとして扱うよう設定
-            conn.text_factory = bytes
-            cursor = conn.cursor()
-
-            # update_time列の追加（なければ）
-            try:
-                cursor.execute("SELECT update_time FROM episodes LIMIT 1")
-            except sqlite3.OperationalError:
-                logger.info("update_time列を追加します")
-                cursor.execute("ALTER TABLE episodes ADD COLUMN update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-                conn.commit()
-
-            # すべてのncodeを取得
-            cursor.execute("SELECT DISTINCT ncode FROM episodes")
-            ncodes = [row[0].decode('utf-8', errors='replace') for row in cursor.fetchall()]
-
-            total_ncodes = len(ncodes)
-            if total_ncodes == 0:
-                logger.info("エピソードデータがありません")
-                conn.close()
-                return
-
-            logger.info(f"エピソードチェック: {total_ncodes}作品のチェックを開始します")
-
-            # 進捗表示初期化
-            self._update_progress(0, total_ncodes, "小説データの整合性チェック中...")
-
-            # 各ncodeに対して処理
-            for idx, ncode in enumerate(ncodes):
-                if hasattr(self, 'cancel_flag') and self.cancel_flag:
-                    break
-
-                # 進捗更新
-                self._update_progress(idx, total_ncodes, f"小説データチェック中: {ncode} ({idx + 1}/{total_ncodes})")
-
-                # rating情報を取得
-                cursor.execute("SELECT rating, general_all_no FROM novels_descs WHERE n_code = ?",
-                               (ncode.encode('utf-8'),))
-                novel_info = cursor.fetchone()
-
-                if not novel_info:
-                    logger.warning(f"{ncode}: 小説情報が見つかりません")
-                    continue
-
-                # バイナリデータをデコード
-                rating = int(novel_info[0]) if novel_info[0] is not None else None
-                general_all_no = int(novel_info[1]) if novel_info[1] is not None else None
-
-                # ratingが0, 4, 5の場合はスキップ
-                if rating in [0, 4, 5]:
-                    logger.info(f"{ncode}: rating={rating}のためスキップします")
-                    continue
-
-                if general_all_no is None:
-                    logger.warning(f"{ncode}: general_all_noが欠落しています")
-                    continue
-
-                # 進捗更新
-                self._update_progress(idx, total_ncodes, f"小説データチェック中: {ncode} ({idx + 1}/{total_ncodes})")
-
-                # rating情報を取得
-                cursor.execute("SELECT rating, general_all_no FROM novels_descs WHERE n_code = ?", (ncode,))
-                novel_info = cursor.fetchone()
-
-                if not novel_info:
-                    logger.warning(f"{ncode}: 小説情報が見つかりません")
-                    continue
-
-                rating, general_all_no = novel_info
-
-                if general_all_no is None:
-                    logger.warning(f"{ncode}: general_all_noが欠落しています")
-                    continue
-
-                # エピソード番号のリストを取得
-                cursor.execute("SELECT episode_no, e_title, body FROM episodes WHERE ncode = ? ORDER BY episode_no",
-                               (ncode,))
-                episodes = cursor.fetchall()
-
-                # 既存のエピソード番号セット
-                existing_ep_nos = set()
-                corrupted_eps = []
-
-                for ep_no, title, body in episodes:
-                    ep_no = int(ep_no)
-                    existing_ep_nos.add(ep_no)
-
-                    # タイトルや本文の破損チェック
-                    if not title or not body or len(title.strip()) == 0 or len(body.strip()) == 0:
-                        corrupted_eps.append(ep_no)
-                        logger.warning(f"{ncode} エピソード{ep_no}: タイトルまたは本文が破損しています")
-
-                # すべての期待されるエピソード番号
-                expected_ep_nos = set(range(1, general_all_no + 1))
-
-                # 欠落しているエピソード番号を特定
-                missing_ep_nos = expected_ep_nos - existing_ep_nos
-
-                # 重複しているエピソード番号を確認
-                cursor.execute("""
-                    SELECT episode_no, COUNT(*) as count 
-                    FROM episodes 
-                    WHERE ncode = ? 
-                    GROUP BY episode_no 
-                    HAVING count > 1
-                """, (ncode,))
-                duplicate_eps = [row[0] for row in cursor.fetchall()]
-
-                if duplicate_eps:
-                    logger.warning(f"{ncode}: 重複エピソード {duplicate_eps} を削除します")
-                    for ep_no in duplicate_eps:
-                        # 重複を削除して最新のものだけを残す
-                        cursor.execute("""
-                            DELETE FROM episodes 
-                            WHERE ncode = ? AND episode_no = ? AND rowid NOT IN (
-                                SELECT MAX(rowid) FROM episodes WHERE ncode = ? AND episode_no = ?
-                            )
-                        """, (ncode, ep_no, ncode, ep_no))
-
-                # 修復が必要なエピソードすべて（欠落 + 破損）
-                repair_eps = list(missing_ep_nos) + corrupted_eps
-
-                if repair_eps:
-                    logger.info(
-                        f"{ncode}: {len(repair_eps)}個のエピソードを修復します（欠落: {len(missing_ep_nos)}, 破損: {len(corrupted_eps)}）")
-
-                    # 非同期でエピソードを取得（最大10個まで一度に処理）
-                    max_repairs_at_once = 10
-                    for i in range(0, len(repair_eps), max_repairs_at_once):
-                        batch = repair_eps[i:i + max_repairs_at_once]
-
-                        # 各エピソードを再取得
-                        for ep_no in batch:
-                            # 進捗メッセージを更新
-                            self._update_progress(
-                                idx,
-                                total_ncodes,
-                                f"{ncode}: エピソード{ep_no}を再取得中... ({i + batch.index(ep_no) + 1}/{len(repair_eps)})"
-                            )
-
-                            # エピソードを再取得
-                            try:
-                                episode, title = await self.novel_updater.catch_up_episode(ncode, ep_no, rating)
-
-                                if episode and title:
-                                    # データベースを更新
-                                    cursor.execute("""
-                                        INSERT OR REPLACE INTO episodes (ncode, episode_no, body, e_title, update_time)
-                                        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-                                    """, (ncode, ep_no, episode, title))
-                                    logger.info(f"{ncode} エピソード{ep_no}: 再取得成功")
-                                else:
-                                    logger.error(f"{ncode} エピソード{ep_no}: 再取得失敗")
-
-                            except Exception as e:
-                                logger.error(f"{ncode} エピソード{ep_no}の再取得中にエラー: {e}")
-
-                            # 一定の間隔をあけてアクセス
-                            await asyncio.sleep(1.0)
-
-                        # バッチごとにコミット
-                        conn.commit()
-                        logger.info(f"{ncode}: バッチ処理完了 ({i + len(batch)}/{len(repair_eps)})")
-
-                        # バッチ間でさらに時間をあける
-                        await asyncio.sleep(2.0)
-
-                # 定期的にコミット
-                if idx % 5 == 0:
-                    conn.commit()
-
-            # 最終コミット
-            conn.commit()
-            logger.info(f"エピソードチェック完了: {total_ncodes}作品")
-
-            # 進捗表示完了
-            self._update_progress(total_ncodes, total_ncodes, "小説データの整合性チェック完了")
-
-        except Exception as e:
-            logger.error(f"エピソードチェック中にエラー: {e}", exc_info=True)
-        finally:
-            if 'conn' in locals():
-                conn.close()
-
-    def show_settings(self):
-        """設定画面を表示"""
-        # 既存のウィジェットをクリア（スクロールキャンバスを除く）
-        for widget in self.list_frame.winfo_children():
-            if widget != self.scroll_canvas:
+    # 設定画面を表示
+    def show_settings():
+        # Clear the existing widgets in the list_frame except scroll_canvas
+        for widget in list_frame.winfo_children():
+            if widget != scroll_canvas:
                 widget.destroy()
 
-        # 設定フレームを作成
-        setting_frame = tk.Frame(self.list_frame, bg="#F0F0F0")
+        # Create a frame for settings
+        setting_frame = tk.Frame(list_frame, bg="#F0F0F0")
         setting_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
-        # フォント選択
+        # Font selection
         font_label = tk.Label(setting_frame, text="フォント:", bg="#F0F0F0", anchor="w")
         font_label.grid(row=0, column=0, sticky="w", pady=5)
-        font_var = tk.StringVar(value=self.set_font)
+        font_var = tk.StringVar(value=set_font)
         font_dropdown = ttk.Combobox(setting_frame, textvariable=font_var, values=tkFont.families())
         font_dropdown.grid(row=0, column=1, sticky="ew", pady=5)
 
-        # フォントサイズ
+        # Font size
         size_label = tk.Label(setting_frame, text="文字サイズ:", bg="#F0F0F0", anchor="w")
         size_label.grid(row=1, column=0, sticky="w", pady=5)
-        size_var = tk.IntVar(value=self.novel_fontsize)
+        size_var = tk.IntVar(value=novel_fontsize)
         size_entry = tk.Entry(setting_frame, textvariable=size_var)
         size_entry.grid(row=1, column=1, sticky="ew", pady=5)
 
-        # 背景色
+        # Background color
         bg_label = tk.Label(setting_frame, text="バックグラウンド色 (RGB):", bg="#F0F0F0", anchor="w")
         bg_label.grid(row=2, column=0, sticky="w", pady=5)
-        bg_var = tk.StringVar(value=self.bg_color)
+        bg_var = tk.StringVar(value=bg_color)
         bg_entry = tk.Entry(setting_frame, textvariable=bg_var)
         bg_entry.grid(row=2, column=1, sticky="ew", pady=5)
 
-        # 設定を適用する関数
+        # Apply button
         def apply_settings():
-            self.novel_fontsize = size_var.get()
-            self.set_font = font_var.get()
-            self.bg_color = bg_var.get()
+            nonlocal novel_fontsize, set_font, bg_color
+            novel_fontsize = size_var.get()
+            set_font = font_var.get()
+            bg_color = bg_var.get()
 
-            # ConfigParserオブジェクトを作成
+            # Create a ConfigParser object
             config = configparser.ConfigParser()
 
-            # 設定を追加
+            # Add settings to the config object
             config['Settings'] = {
-                'Font': self.set_font,
-                'FontSize': self.novel_fontsize,
-                'BackgroundColor': self.bg_color
+                'Font': font_var.get(),
+                'FontSize': novel_fontsize,
+                'BackgroundColor': bg_var.get()
             }
 
-            # 設定をファイルに書き込む
+            # Write the settings to a config file
             with open('settings.ini', 'w') as configfile:
                 config.write(configfile)
 
-            messagebox.showinfo("設定", "設定が保存されました")
+            tk.messagebox.showinfo("設定", "設定が保存されました")
 
-        # 適用ボタン
         apply_button = ttk.Button(setting_frame, text="適用", command=apply_settings)
         apply_button.grid(row=3, column=0, columnspan=2, pady=10)
 
-    def show_input_screen(self):
-        """入力画面を表示"""
-        input_window = tk.Toplevel(self.root)
+    # 入力画面を表示
+    def show_input_screen():
+        input_window = tk.Toplevel()
         input_window.title("入力画面")
         input_window.geometry("500x300")
 
@@ -673,28 +402,61 @@ class NovelApp:
 
         def send_input(event=None):
             user_input = input_text.get("1.0", tk.END).strip()
-            logger.info(f"User input: {user_input}")
+            print(f"User input: {user_input}")
 
             if user_input == "exit":
-                self.root.quit()
+                root.quit()
             elif "update" in user_input:
-                parts = user_input.split("update")
-                if "--all" in parts[1]:
-                    self.update_all_novels_async(self.main_shinchaku)
-                elif "--single" in parts[1]:
-                    single_parts = parts[1].split("--single")
-                    if "--re_all" in single_parts[1] and "--n" in single_parts[1]:
-                        ncode = single_parts[1].split("--")[1].strip()
-                        self.re_fetch_all_episodes_async(ncode)
-                    elif "--get_lost" in single_parts[1] and "--n" in single_parts[1]:
-                        ncode = single_parts[1].split("--")[1].strip()
-                        self.get_missing_episodes_async(ncode)
+                user_input = user_input.split("update")
+                if "--all" in user_input[1]:
+                    # 非同期で更新処理を実行
+                    app.executor.run_in_background(
+                        lambda progress_callback: update_all_novels_async(main_shinchaku, progress_callback),
+                        on_complete=on_update_complete
+                    )
+                elif "--single" in user_input[1]:
+                    user_input = user_input[1].split("--single")
+                    if "--re_all" in user_input[1]:
+                        if "--n" in user_input[1]:
+                            ncode = user_input[1].split("--")[1].strip()
+                            # 非同期で再取得処理を実行
+                            app.executor.run_in_background(
+                                lambda progress_callback: re_fetch_all_episodes_async(ncode, progress_callback),
+                                on_complete=on_update_complete
+                            )
+                        else:
+                            print("Please provide an ncode to update.")
+                            input_label.config(text="ncodeを指定してください")
+                    elif "--get_lost" in user_input[1]:
+                        if "--n" in user_input[1]:
+                            ncode = user_input[1].split("--")[1].strip()
+                            # 非同期で欠落エピソード取得処理を実行
+                            app.executor.run_in_background(
+                                lambda progress_callback: get_missing_episodes_async(ncode, progress_callback),
+                                on_complete=on_update_complete
+                            )
+                        else:
+                            print("Please provide an ncode to update.")
+                            input_label.config(text="ncodeを指定してください")
                     else:
-                        input_label.config(text="コマンドが正しくありません")
+                        print("Invalid command.")
+                        input_label.config(text="コマンドが無効です")
                 else:
-                    input_label.config(text="コマンドが正しくありません")
+                    print("Invalid command.")
+                    input_label.config(text="コマンドが無効です")
+            elif "n" in user_input:
+                ncode = user_input
+                try:
+                    novel_index = int(ncode)
+                    if 0 <= novel_index < len(main_shelf):
+                        input_label.config(
+                            text="ncode:" + main_shelf[novel_index][0] + "title:" + main_shelf[novel_index][1])
+                    else:
+                        input_label.config(text="無効なインデックスです")
+                except ValueError:
+                    input_label.config(text=f"User input: {user_input}")
             else:
-                input_label.config(text=f"入力: {user_input}")
+                input_label.config(text=f"User input: {user_input}")
 
             input_text.delete("1.0", tk.END)
 
@@ -705,248 +467,128 @@ class NovelApp:
         exit_button.pack(pady=10)
         input_text.bind("<Return>", send_input)
 
-    def show_updated_novels(self):
-        """更新された小説一覧を表示"""
-        self._refresh_scroll_frame()
+    # 更新された小説の一覧を表示
+    async def show_updated_novels():
+        global scrollable_frame, scroll_canvas
 
-        # データを準備
+        # Clear the existing widgets in the list_frame
+        for widget in list_frame.winfo_children():
+            widget.destroy()
+
+        # Create a canvas and a scrollbar
+        scroll_canvas = tk.Canvas(list_frame, bg="#F0F0F0")
+        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=scroll_canvas.yview)
+        scrollable_frame = ttk.Frame(scroll_canvas)
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: scroll_canvas.configure(scrollregion=scroll_canvas.bbox("all"))
+        )
+
         buttons_data = [
-            {"text": f"{row[1]}", "n_code": row[0], "ep_no": row[2], "gen_all_no": row[3], "rating": row[4]}
-            for row in self.main_shinchaku
+            {"title": f"更新", "text": f"{row[1]}", "n_code": row[0], "ep_no": row[2], "gen_all_no": row[3],
+             "rating": row[4]}
+            for row in main_shinchaku
         ]
 
-        # 「一括更新」ボタンを上部に追加
+        scroll_canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        scroll_canvas.configure(yscrollcommand=scrollbar.set)
+
+        scroll_canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Add the "一括更新" button at the top
         update_all_button = ttk.Button(
-            self.scrollable_frame,
+            scrollable_frame,
             text="一括更新",
-            command=lambda: self.update_all_novels_async(self.main_shinchaku)
+            command=lambda: app.executor.run_in_background(
+                lambda progress_callback: update_all_novels_async(main_shinchaku, progress_callback),
+                on_complete=on_update_complete
+            )
         )
         update_all_button.pack(fill="x", pady=2)
 
-        # 更新された小説ごとにラベルを作成
+        # Display each updated novel's title
         for data in buttons_data:
-            frame = tk.Frame(self.scrollable_frame, bg="#F0F0F0")
+            frame = tk.Frame(scrollable_frame, bg="#F0F0F0")
             frame.pack(fill="x", pady=2)
 
-            # タイトルラベル
+            # Title label
             title_label = tk.Label(frame, text=data["text"], bg="#F0F0F0", anchor="w")
             title_label.pack(side="left", padx=5, fill="x", expand=True)
 
-            # クリックイベントをバインド
+            # Bind click event to the label
             title_label.bind(
                 "<Button-1>",
-                lambda e, n_code=data["n_code"], ep_no=data["ep_no"],
-                       gen_all_no=data["gen_all_no"], rating=data["rating"]:
-                self.update_novel_async(n_code, ep_no, gen_all_no, rating)
+                lambda e, n_code=data["n_code"], ep_no=data["ep_no"], gen_all_no=data["gen_all_no"],
+                       rating=data["rating"]:
+                app.executor.run_in_background(
+                    lambda progress_callback: update_novel_async(n_code, ep_no, gen_all_no, rating, progress_callback),
+                    on_complete=on_update_complete
+                )
             )
 
-    async def _check_updates_async(self, progress_callback):
-        """更新をチェックする非同期関数"""
-        try:
-            # データベース更新
-            progress_callback(0, "データベースを更新中...")
-            await self.novel_updater.db_update()
-
-            # 新着チェック
-            progress_callback(50, "新着小説をチェック中...")
-            shinchaku_ep, main_shinchaku, shinchaku_novel = await self.novel_updater.shinchaku_checker()
-
-            return shinchaku_ep, main_shinchaku, shinchaku_novel
-
-        except Exception as e:
-            logger.error(f"Error checking updates: {e}")
-            raise
-
-    def check_updates(self):
-        """更新チェックを実行"""
-        if not self.novel_updater:
-            messagebox.showerror("エラー", "小説更新機能が初期化されていません")
-            return
-
-        # 更新チェックを開始
-        self.executor.run_in_background(
-            self._check_updates_async,
-            on_complete=self._on_check_updates_complete
-        )
-
-    def _on_check_updates_complete(self, result):
-        """更新チェック完了時の処理"""
-        if result:
-            shinchaku_ep, main_shinchaku, shinchaku_novel = result
-
-            # UIを更新
-            self.shinchaku_ep = shinchaku_ep
-            self.main_shinchaku = main_shinchaku
-            self.shinchaku_novel = shinchaku_novel
-
-            self.header_label.config(text=f"新着情報\n新着{shinchaku_novel}件,{shinchaku_ep}話")
-
-            # 更新情報を表示
-            messagebox.showinfo(
-                "更新チェック完了",
-                f"新着小説: {shinchaku_novel}件\n新着エピソード: {shinchaku_ep}話"
-            )
-
-            # 新着リストがあれば表示
-            if main_shinchaku:
-                self.show_updated_novels()
-
-    async def _update_novel_async(self, n_code, episode_no, general_all_no, rating, progress_callback):
-        """小説を更新する非同期関数"""
-        try:
-            # エピソードを取得
-            await self.novel_updater.new_episode(n_code, episode_no, general_all_no, rating)
-
-            # データベースの更新
-            progress_callback(90, "データベースを更新中...")
-            await self.novel_updater._update_total_episodes_single(n_code)
-
-            # 新着情報を更新
-            progress_callback(95, "新着情報を更新中...")
-            shinchaku_ep, main_shinchaku, shinchaku_novel = await self.novel_updater.shinchaku_checker()
-
-            return {
-                "n_code": n_code,
-                "shinchaku_ep": shinchaku_ep,
-                "main_shinchaku": main_shinchaku,
-                "shinchaku_novel": shinchaku_novel
-            }
-
-        except Exception as e:
-            logger.error(f"Error updating novel {n_code}: {e}")
-            raise
-
-    def update_novel_async(self, n_code, episode_no, general_all_no, rating):
-        """非同期小説更新を開始"""
-        if not self.novel_updater:
-            messagebox.showerror("エラー", "小説更新機能が初期化されていません")
-            return
-
-        # 小説更新を開始
-        self.executor.run_in_background(
-            lambda progress_callback: self._update_novel_async(
-                n_code, episode_no, general_all_no, rating, progress_callback
-            ),
-            on_complete=self._on_update_novel_complete
-        )
-
-    def _on_update_novel_complete(self, result):
-        """小説更新完了時の処理"""
-        if result:
-            # UIを更新
-            self.shinchaku_ep = result["shinchaku_ep"]
-            self.main_shinchaku = result["main_shinchaku"]
-            self.shinchaku_novel = result["shinchaku_novel"]
-
-            self.header_label.config(text=f"新着情報\n新着{self.shinchaku_novel}件,{self.shinchaku_ep}話")
-
-            # 小説一覧と更新された小説一覧を更新
-            self.show_novel_list()
-            self.show_updated_novels()
-
-            # 成功メッセージを表示
-            messagebox.showinfo("更新完了", f"小説 {result['n_code']} の更新が完了しました")
-
-    async def _update_all_novels_async(self, shinchaku_novels, progress_callback):
+    # 非同期処理：すべての小説を更新
+    async def update_all_novels_async(shinchaku_novels, progress_callback):
         """すべての新着小説を更新する非同期関数"""
-        try:
-            if not shinchaku_novels:
-                return {
-                    "shinchaku_ep": 0,
-                    "main_shinchaku": [],
-                    "shinchaku_novel": 0,
-                    "updated_count": 0
-                }
-
-            progress_callback(0, "小説を更新中...")
-
-            # すべての小説を更新
-            results = await self.novel_updater.update_all_novels(shinchaku_novels)
-
-            # 戻り値をデバッグログに出力
-            logger.info(f"update_all_novels returned: {type(results)}")
-            logger.info(f"results content: {results}")
-
-            # 辞書形式で返す
-            return results
-
-        except Exception as e:
-            logger.error(f"Error updating all novels: {e}", exc_info=True)
-            # エラーが発生してもUIを更新できるよう値を返す
-            return {
-                "shinchaku_ep": 0,
-                "main_shinchaku": [],
-                "shinchaku_novel": 0,
-                "updated_count": 0,
-                "error": str(e)
-            }
-
-    def update_all_novels_async(self, shinchaku_novels):
-        """すべての新着小説の非同期更新を開始"""
-        if not self.novel_updater:
-            messagebox.showerror("エラー", "小説更新機能が初期化されていません")
-            return
+        if not app.novel_updater:
+            progress_callback(100, "小説更新機能が初期化されていません")
+            return {"error": "小説更新機能が初期化されていません"}
 
         if not shinchaku_novels:
-            messagebox.showinfo("情報", "更新する小説がありません")
-            return
+            progress_callback(100, "更新する小説がありません")
+            return {"error": "更新する小説がありません"}
 
-        # すべての小説の更新を開始
-        self.executor.run_in_background(
-            lambda progress_callback: self._update_all_novels_async(
-                shinchaku_novels, progress_callback
-            ),
-            on_complete=self._on_update_all_novels_complete
-        )
+        progress_callback(0, "小説を一括更新中...")
 
-    def _on_update_all_novels_complete(self, result):
-        """すべての小説更新完了時の処理"""
-        try:
-            # resultがNoneの場合のエラーハンドリング
-            if result is None:
-                messagebox.showerror("エラー", "更新処理が失敗しました。詳細はログを確認してください。")
-                return
+        # 小説更新クラスを使用して更新
+        results = await app.novel_updater.update_all_novels(shinchaku_novels)
 
-            # 型をチェック
-            logger.info(f"Received result type: {type(result)}")
+        progress_callback(100, "小説の更新が完了しました")
+        return results
 
-            # エラーがあるか確認
-            if "error" in result:
-                messagebox.showerror("エラー", f"更新中にエラーが発生しました: {result['error']}")
+    # 非同期処理：特定の小説を更新
+    async def update_novel_async(n_code, episode_no, general_all_no, rating, progress_callback):
+        """指定した小説を更新する非同期関数"""
+        if not app.novel_updater:
+            progress_callback(100, "小説更新機能が初期化されていません")
+            return {"error": "小説更新機能が初期化されていません"}
 
-            # UIを更新
-            self.shinchaku_ep = result.get("shinchaku_ep", 0)
-            self.main_shinchaku = result.get("main_shinchaku", [])
-            self.shinchaku_novel = result.get("shinchaku_novel", 0)
+        progress_callback(0, f"{n_code}を更新中...")
 
-            self.header_label.config(text=f"新着情報\n新着{self.shinchaku_novel}件,{self.shinchaku_ep}話")
+        # エピソードを取得
+        await app.novel_updater.new_episode(n_code, episode_no, general_all_no, rating)
 
-            # 更新された小説一覧を表示
-            self.show_updated_novels()
+        # データベースの更新
+        progress_callback(90, "データベースを更新中...")
+        await app.novel_updater._update_total_episodes_single(n_code)
 
-            # 成功メッセージを表示
-            updated_count = result.get("updated_count", 0)
-            messagebox.showinfo(
-                "一括更新完了",
-                f"{updated_count}件の小説が更新されました"
-            )
-        except Exception as e:
-            logger.error(f"Error in _on_update_all_novels_complete: {e}", exc_info=True)
-            messagebox.showerror("エラー", f"結果の処理中にエラーが発生しました: {str(e)}")
-            # バックアップメッセージを表示
-            self.show_updated_novels()
+        # 新着情報を更新
+        progress_callback(95, "新着情報を更新中...")
+        shinchaku_ep, main_shinchaku, shinchaku_novel = await app.novel_updater.shinchaku_checker()
 
-    async def _re_fetch_all_episodes_async(self, ncode, progress_callback):
+        return {
+            "n_code": n_code,
+            "shinchaku_ep": shinchaku_ep,
+            "main_shinchaku": main_shinchaku,
+            "shinchaku_novel": shinchaku_novel
+        }
+
+    # 非同期処理：すべてのエピソードを再取得
+    async def re_fetch_all_episodes_async(ncode, progress_callback):
         """小説のすべてのエピソードを再取得する非同期関数"""
-        try:
-            progress_callback(0, f"{ncode}のエピソード情報を取得中...")
+        if not app.novel_updater:
+            progress_callback(100, "小説更新機能が初期化されていません")
+            return {"success": False, "message": "小説更新機能が初期化されていません"}
 
-            # データベースから現在のエピソード情報を取得
-            conn = sqlite3.connect('database/novel_status.db')
-            cursor = conn.cursor()
+        progress_callback(0, f"{ncode}のエピソード情報を取得中...")
 
-            cursor.execute('SELECT n_code, rating, general_all_no FROM novels_descs WHERE n_code = ?', (ncode,))
-            novel_info = cursor.fetchone()
+        async with AsyncConnection('database/novel_status.db') as db:
+            # その小説の情報を取得
+            cursor = await db.execute('SELECT n_code, rating, general_all_no FROM novels_descs WHERE n_code = ?',
+                                      (ncode,))
+            result = await db.fetchall(cursor)
+            novel_info = result[0] if result else None
 
             if not novel_info:
                 return {"success": False, "message": f"小説 {ncode} が見つかりません"}
@@ -959,76 +601,58 @@ class NovelApp:
             # エピソードを再取得
             progress_callback(10, f"{ncode}のエピソードを再取得中...")
             for i in range(general_all_no):
-                if i % 5 == 0:  # 進捗更新
-                    progress = int(10 + (i / general_all_no) * 80)
-                    progress_callback(progress, f"エピソード {i + 1}/{general_all_no} を取得中...")
-
                 episode_no = i + 1
-                episode, title = await self.novel_updater.catch_up_episode(ncode, episode_no, rating)
+                progress = int(10 + (i / general_all_no) * 80)
+                progress_callback(progress, f"エピソード {episode_no}/{general_all_no} を取得中...")
+
+                episode, title = await app.novel_updater.catch_up_episode(ncode, episode_no, rating)
 
                 if episode and title:
                     # データベースを更新
-                    cursor.execute("""
+                    await db.execute("""
                         INSERT OR REPLACE INTO episodes (ncode, episode_no, body, e_title)
                         VALUES (?, ?, ?, ?)
                     """, (ncode, episode_no, episode, title))
 
                     if episode_no % 10 == 0:  # 10エピソードごとにコミット
-                        conn.commit()
+                        await db.commit()
 
                 # レート制限を回避するために待機
                 await asyncio.sleep(0.5)
 
             # 最終コミット
-            conn.commit()
+            await db.commit()
 
             # 総エピソード数を更新
             progress_callback(95, "データベースを更新中...")
-            await self.novel_updater._update_total_episodes_single(ncode)
+            await app.novel_updater._update_total_episodes_single(ncode)
 
-            conn.close()
+            # 新着情報を更新
+            shinchaku_ep, main_shinchaku, shinchaku_novel = await app.novel_updater.shinchaku_checker()
 
-            return {"success": True, "message": f"{ncode}の全{general_all_no}エピソードを再取得しました"}
+            return {
+                "success": True,
+                "message": f"{ncode}の全{general_all_no}エピソードを再取得しました",
+                "shinchaku_ep": shinchaku_ep,
+                "main_shinchaku": main_shinchaku,
+                "shinchaku_novel": shinchaku_novel
+            }
 
-        except Exception as e:
-            logger.error(f"Error re-fetching episodes for {ncode}: {e}")
-            if 'conn' in locals():
-                conn.close()
-            raise
-
-    def re_fetch_all_episodes_async(self, ncode):
-        """小説のすべてのエピソードの非同期再取得を開始"""
-        if not self.novel_updater:
-            messagebox.showerror("エラー", "小説更新機能が初期化されていません")
-            return
-
-        # 再取得を開始
-        self.executor.run_in_background(
-            lambda progress_callback: self._re_fetch_all_episodes_async(
-                ncode, progress_callback
-            ),
-            on_complete=self._on_re_fetch_all_episodes_complete
-        )
-
-    def _on_re_fetch_all_episodes_complete(self, result):
-        """エピソード再取得完了時の処理"""
-        if result:
-            if result["success"]:
-                messagebox.showinfo("完了", result["message"])
-            else:
-                messagebox.showerror("エラー", result["message"])
-
-    async def _get_missing_episodes_async(self, ncode, progress_callback):
+    # 非同期処理：欠落しているエピソードを取得
+    async def get_missing_episodes_async(ncode, progress_callback):
         """欠落しているエピソードを取得する非同期関数"""
-        try:
-            progress_callback(0, f"{ncode}のエピソード情報を取得中...")
+        if not app.novel_updater:
+            progress_callback(100, "小説更新機能が初期化されていません")
+            return {"success": False, "message": "小説更新機能が初期化されていません"}
 
-            # データベースから現在のエピソード情報を取得
-            conn = sqlite3.connect('database/novel_status.db')
-            cursor = conn.cursor()
+        progress_callback(0, f"{ncode}のエピソード情報を取得中...")
 
-            cursor.execute('SELECT n_code, rating, general_all_no FROM novels_descs WHERE n_code = ?', (ncode,))
-            novel_info = cursor.fetchone()
+        async with AsyncConnection('database/novel_status.db') as db:
+            # その小説の情報を取得
+            cursor = await db.execute('SELECT n_code, rating, general_all_no FROM novels_descs WHERE n_code = ?',
+                                      (ncode,))
+            result = await db.fetchall(cursor)
+            novel_info = result[0] if result else None
 
             if not novel_info:
                 return {"success": False, "message": f"小説 {ncode} が見つかりません"}
@@ -1039,8 +663,9 @@ class NovelApp:
                 return {"success": False, "message": f"小説 {ncode} のエピソード数情報がありません"}
 
             # 既存のエピソードを取得
-            cursor.execute('SELECT episode_no FROM episodes WHERE ncode = ?', (ncode,))
-            existing_episodes = [int(row[0]) for row in cursor.fetchall()]
+            cursor = await db.execute('SELECT episode_no FROM episodes WHERE ncode = ?', (ncode,))
+            result = await db.fetchall(cursor)
+            existing_episodes = [int(row[0]) for row in result]
 
             # 欠落しているエピソードを特定
             all_episodes = set(range(1, general_all_no + 1))
@@ -1057,166 +682,225 @@ class NovelApp:
                 progress = int(10 + (i / total_missing) * 80)
                 progress_callback(progress, f"欠落エピソード {i + 1}/{total_missing} ({episode_no}) を取得中...")
 
-                episode, title = await self.novel_updater.catch_up_episode(ncode, episode_no, rating)
+                episode, title = await app.novel_updater.catch_up_episode(ncode, episode_no, rating)
 
                 if episode and title:
                     # データベースを更新
-                    cursor.execute("""
+                    await db.execute("""
                         INSERT OR REPLACE INTO episodes (ncode, episode_no, body, e_title)
                         VALUES (?, ?, ?, ?)
                     """, (ncode, episode_no, episode, title))
 
                     if i % 10 == 0:  # 10エピソードごとにコミット
-                        conn.commit()
+                        await db.commit()
 
                 # レート制限を回避するために待機
                 await asyncio.sleep(0.5)
 
             # 最終コミット
-            conn.commit()
+            await db.commit()
 
             # 総エピソード数を更新
             progress_callback(95, "データベースを更新中...")
-            await self.novel_updater._update_total_episodes_single(ncode)
+            await app.novel_updater._update_total_episodes_single(ncode)
 
-            conn.close()
+            # 新着情報を更新
+            shinchaku_ep, main_shinchaku, shinchaku_novel = await app.novel_updater.shinchaku_checker()
 
             return {
                 "success": True,
-                "message": f"{ncode}の欠落{total_missing}エピソードを取得しました"
+                "message": f"{ncode}の欠落{total_missing}エピソードを取得しました",
+                "shinchaku_ep": shinchaku_ep,
+                "main_shinchaku": main_shinchaku,
+                "shinchaku_novel": shinchaku_novel
             }
 
-        except Exception as e:
-            logger.error(f"Error getting missing episodes for {ncode}: {e}")
-            if 'conn' in locals():
-                conn.close()
-            raise
+    # 更新完了時のコールバック関数
+    def on_update_complete(result):
+        """更新処理が完了したときに呼び出されるコールバック関数"""
+        global shinchaku_ep, main_shinchaku, shinchaku_novel
 
-    def get_missing_episodes_async(self, ncode):
-        """欠落エピソードの非同期取得を開始"""
-        if not self.novel_updater:
-            messagebox.showerror("エラー", "小説更新機能が初期化されていません")
+        if not result:
+            tk.messagebox.showerror("エラー", "更新処理が失敗しました。詳細はログを確認してください。")
             return
 
-        # 欠落エピソードの取得を開始
-        self.executor.run_in_background(
-            lambda progress_callback: self._get_missing_episodes_async(
-                ncode, progress_callback
-            ),
-            on_complete=self._on_get_missing_episodes_complete
+        # エラーがあるか確認
+        if "error" in result:
+            tk.messagebox.showerror("エラー", f"更新中にエラーが発生しました: {result['error']}")
+            return
+
+        # 成功しなかった場合
+        if "success" in result and not result["success"]:
+            tk.messagebox.showerror("エラー", result.get("message", "不明なエラーが発生しました"))
+            return
+
+        # 新着情報の更新
+        if "shinchaku_ep" in result:
+            shinchaku_ep = result["shinchaku_ep"]
+        if "main_shinchaku" in result:
+            main_shinchaku = result["main_shinchaku"]
+        if "shinchaku_novel" in result:
+            shinchaku_novel = result["shinchaku_novel"]
+
+        # ヘッダーの更新
+        header_label.config(text=f"新着情報\n新着{shinchaku_novel}件,{shinchaku_ep}話")
+
+        # 成功メッセージ
+        message = result.get("message", "小説の更新が完了しました")
+        tk.messagebox.showinfo("更新完了", message)
+
+        # 小説一覧と更新された小説リストを再表示
+        if "n_code" in result:
+            # 単一小説の更新の場合
+            # GUIスレッドから非同期関数を呼び出す
+            asyncio.run_coroutine_threadsafe(show_novel_list(), app.loop)
+            asyncio.run_coroutine_threadsafe(show_updated_novels(), app.loop)
+        else:
+            # 複数小説の更新または再取得の場合
+            asyncio.run_coroutine_threadsafe(show_updated_novels(), app.loop)
+
+    # 非同期機能：更新をチェック
+    async def check_updates_async(progress_callback):
+        """非同期での更新チェック"""
+        if not app.novel_updater:
+            return {"error": "小説更新機能が初期化されていません"}
+
+        # データベース更新
+        progress_callback(0, "データベースを更新中...")
+        await app.novel_updater.db_update()
+
+        # 新着チェック
+        progress_callback(50, "新着小説をチェック中...")
+        shinchaku_ep, main_shinchaku, shinchaku_novel = await app.novel_updater.shinchaku_checker()
+
+        return {
+            "shinchaku_ep": shinchaku_ep,
+            "main_shinchaku": main_shinchaku,
+            "shinchaku_novel": shinchaku_novel
+        }
+
+    # 更新チェックを実行
+    def check_updates():
+        """更新チェックを実行（GUIから呼び出される）"""
+        if not app.novel_updater:
+            tk.messagebox.showerror("エラー", "小説更新機能が初期化されていません")
+            return
+
+        # 更新チェックを開始
+        app.executor.run_in_background(
+            check_updates_async,
+            on_complete=on_update_complete
         )
 
-    def _on_get_missing_episodes_complete(self, result):
-        """欠落エピソード取得完了時の処理"""
-        if result:
-            if result["success"]:
-                messagebox.showinfo("完了", result["message"])
-            else:
-                messagebox.showerror("エラー", result["message"])
+    # 非同期データベース接続ユーティリティクラス
+    class AsyncConnection:
+        def __init__(self, db_path):
+            self.db_path = db_path
+            self.conn = None
 
+        async def __aenter__(self):
+            def connect():
+                conn = sqlite3.connect(self.db_path)
+                return conn
 
-# アプリの起動関数
-# main_view_async.pyのstart_app関数を修正
+            self.conn = await asyncio.to_thread(connect)
+            return self
 
-    # 初期化時にPythonバージョンをログに記録
-def log_python_version():
-    """Pythonバージョン情報をログに記録する"""
-    version_info = sys.version_info
-    logger.info(f"Running on Python {version_info.major}.{version_info.minor}.{version_info.micro}")
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            if self.conn:
+                await asyncio.to_thread(self.conn.close)
 
-    # asyncioのバージョン情報も記録
-    asyncio_version = getattr(asyncio, "__version__", "unknown")
-    logger.info(f"asyncio version: {asyncio_version}")
+        async def execute(self, sql, params=None):
+            if params is None:
+                params = []
+            cursor = self.conn.cursor()
+            await asyncio.to_thread(lambda: cursor.execute(sql, params))
+            return cursor
 
-    # Python 3.11未満ではasyncio.timeoutが利用できないことを警告
-    if version_info < (3, 11):
-        logger.warning("Python version < 3.11 detected. Using asyncio.wait_for for timeout handling.")
-async def start_app():
-    """アプリケーションを起動する非同期関数"""
-    # 初期化処理
-    dell_dl()
-    del_yml()
+        async def fetchall(self, cursor):
+            return await asyncio.to_thread(cursor.fetchall)
 
-    # コマンドライン引数の処理
-    import argparse
-    parser = argparse.ArgumentParser(description='小説アプリ')
-    parser.add_argument('--no-verify-ssl', action='store_true', help='SSL証明書の検証を無効にする')
-    args = parser.parse_args()
+        async def commit(self):
+            await asyncio.to_thread(self.conn.commit)
 
-    # SSL検証設定をログに記録
-    if args.no_verify_ssl:
-        logger.warning("SSLの検証が無効になっています。これはセキュリティリスクとなる可能性があります。")
+    current_row = 0
 
-    # メインウィンドウを作成
-    root = tk.Tk()
+    # 「小説をさがす」セクション
+    create_section_title(content_frame, "小説をさがす", current_row)
+    current_row += 1
+    search_buttons = ["ランキング", "キーワード検索", "詳細検索", "ノクターノベルズ", "ムーンライトノベルズ", "PickUp!"]
+    for btn_text in search_buttons:
+        create_button(content_frame, btn_text, current_row)
+        current_row += 1
 
-    # アプリを初期化
-    app = NovelApp(root)
+    # 「小説を読む」セクション
+    create_section_title(content_frame, "小説を読む", current_row)
+    current_row += 1
 
-    # 非同期小説更新クラスを初期化（SSL設定を渡す）
-    try:
-        # NovelUpdaterインスタンスを作成
-        novel_updater = NovelUpdater(verify_ssl=not args.no_verify_ssl)
-        # 初期化
-        app.novel_updater = await novel_updater.initialize()
-        logger.info("小説更新機能の初期化に成功しました")
-    except Exception as e:
-        logger.error(f"Failed to initialize novel updater: {e}")
-        messagebox.showerror("初期化エラー",
-                             f"小説更新機能の初期化に失敗しました：{e}\n\nアプリを再起動してください。")
-        app.novel_updater = None  # 明示的にNoneを設定
+    # GUIから非同期関数を呼び出すためのラッパー関数
+    def wrap_async(coro_func):
+        """非同期コルーチンをGUIから呼び出すためのラッパー"""
 
-    # データを読み込み
-    app.main_shelf = shelf_maker()
-    app.last_read_novel, app.last_read_epno = get_last_read(app.main_shelf)
-    app.set_font, app.novel_fontsize, app.bg_color = load_conf()
+        def wrapper(*args, **kwargs):
+            return asyncio.run_coroutine_threadsafe(coro_func(*args, **kwargs), app.loop)
 
-    # エピソードデータの整合性チェック（新機能）
-    if app.novel_updater:  # novel_updaterが有効な場合のみ実行
-        try:
-            logger.info("エピソードデータの整合性チェックを開始します")
-            await app.initialize_episode_checker()
-        except Exception as e:
-            logger.error(f"エピソードデータチェック中にエラー: {e}")
-            messagebox.showwarning(
-                "警告",
-                "エピソードデータの整合性チェック中にエラーが発生しました。\n"
-                "アプリは起動しますが、一部のエピソードが正しく表示されない可能性があります。"
-            )
+        return wrapper
 
-    # 新着情報を取得
-    shinchaku_ep, main_shinchaku, shinchaku_novel = 0, [], 0
+    read_buttons = [
+        ("小説一覧", wrap_async(show_novel_list)),
+        ("最近更新された小説", wrap_async(show_updated_novels)),
+        ("最近読んだ小説", None),
+        ("作者別・シリーズ別", None),
+        ("タグ検索", None),
+    ]
+    for btn_text, command in read_buttons:
+        create_button(content_frame, btn_text, current_row, command=command)
+        current_row += 1
 
-    if app.novel_updater:  # novel_updaterが有効な場合のみ実行
-        try:
-            shinchaku_ep, main_shinchaku, shinchaku_novel = await app.novel_updater.shinchaku_checker()
-        except Exception as e:
-            logger.error(f"新着チェック中にエラー: {e}")
+    # 「オプション」セクション
+    create_section_title(content_frame, "オプション", current_row)
+    current_row += 1
+    option_buttons = [
+        ("ダウンロード状況", None),
+        ("設定", show_settings),
+        ("更新チェック", check_updates)
+    ]
+    for btn_text in option_buttons:
+        create_button(content_frame, btn_text, current_row)
+        current_row += 1
 
-    app.shinchaku_ep = shinchaku_ep
-    app.main_shinchaku = main_shinchaku
-    app.shinchaku_novel = shinchaku_novel
+    # アプリの起動
+    root.bind('<Command-@>', lambda event: show_input_screen())
 
-    # ヘッダーを更新
-    app.header_label.config(text=f"新着情報\n新着{shinchaku_novel}件,{shinchaku_ep}話")
+    # 非同期イベントループをバックグラウンドで実行
+    def run_event_loop(loop):
+        asyncio.set_event_loop(loop)
+        loop.run_forever()
 
-    # 最後に読んだ小説情報を更新
-    if app.last_read_novel:
-        app.last_read_label.config(text=f"最後に開いていた小説\n{app.last_read_novel[1]} {app.last_read_epno}話")
+    # イベントループスレッドの作成
+    event_loop_thread = threading.Thread(target=run_event_loop, args=(app.loop,), daemon=True)
+    event_loop_thread.start()
 
-    return app, root
-# メイン関数
-def main():
-    # 非同期処理でアプリを起動
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    # アプリ終了時のクリーンアップ処理
+    def on_closing():
+        # アプリケーションを終了すると通知
+        app.running = False
 
-    # アプリの初期化と起動
-    app, root = loop.run_until_complete(start_app())
+        # イベントループを停止
+        app.loop.call_soon_threadsafe(app.loop.stop)
 
-    # GUIループを開始
+        # BackgroundExecutorをシャットダウン
+        app.executor.shutdown()
+
+        # NovelUpdaterのクローズ処理を実行
+        if app.novel_updater:
+            asyncio.run_coroutine_threadsafe(app.novel_updater.close(), app.loop)
+
+        # 少し待機してからウィンドウを破棄
+        root.after(100, root.destroy)
+
+    # ウィンドウ終了時のイベントハンドラを設定
+    root.protocol("WM_DELETE_WINDOW", on_closing)
+
+    # Tkインターフェースを開始
     root.mainloop()
-
-
-if __name__ == "__main__":
-    main()
