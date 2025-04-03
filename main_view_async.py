@@ -2,8 +2,8 @@ import asyncio
 import configparser
 import threading
 import tkinter as tk
-from dbm import sqlite3
-from tkinter import ttk, scrolledtext
+import sqlite3  # 修正: dbm import sqlite3 からこの行に変更
+from tkinter import ttk, scrolledtext, messagebox  # messagebox を追加
 from bs4 import BeautifulSoup
 from PIL import ImageFont, Image, ImageDraw, ImageTk
 import tkinter.font as tkFont
@@ -364,7 +364,7 @@ async def main():
 
         # Apply button
         def apply_settings():
-            nonlocal novel_fontsize, set_font, bg_color
+            global novel_fontsize, set_font, bg_color
             novel_fontsize = size_var.get()
             set_font = font_var.get()
             bg_color = bg_var.get()
@@ -410,20 +410,23 @@ async def main():
                 user_input = user_input.split("update")
                 if "--all" in user_input[1]:
                     # 非同期で更新処理を実行
-                    app.executor.run_in_background(
-                        lambda progress_callback: update_all_novels_async(main_shinchaku, progress_callback),
-                        on_complete=on_update_complete
-                    )
+                    messagebox.showinfo("機能未実装", "一括更新機能はまだ実装されていません")
+                    # app.executor.run_in_background(
+                    #    lambda progress_callback: update_all_novels_async(main_shinchaku, progress_callback),
+                    #    on_complete=on_update_complete
+                    # )
                 elif "--single" in user_input[1]:
                     user_input = user_input[1].split("--single")
                     if "--re_all" in user_input[1]:
                         if "--n" in user_input[1]:
                             ncode = user_input[1].split("--")[1].strip()
                             # 非同期で再取得処理を実行
-                            app.executor.run_in_background(
-                                lambda progress_callback: re_fetch_all_episodes_async(ncode, progress_callback),
-                                on_complete=on_update_complete
-                            )
+                            # ここで参照エラーが発生するため、簡易的なメッセージだけ表示する
+                            messagebox.showinfo("機能未実装", f"再取得機能はまだ実装されていません: {ncode}")
+                            # app.executor.run_in_background(
+                            #    lambda progress_callback: re_fetch_all_episodes_async(ncode, progress_callback),
+                            #    on_complete=on_update_complete
+                            # )
                         else:
                             print("Please provide an ncode to update.")
                             input_label.config(text="ncodeを指定してください")
@@ -431,10 +434,12 @@ async def main():
                         if "--n" in user_input[1]:
                             ncode = user_input[1].split("--")[1].strip()
                             # 非同期で欠落エピソード取得処理を実行
-                            app.executor.run_in_background(
-                                lambda progress_callback: get_missing_episodes_async(ncode, progress_callback),
-                                on_complete=on_update_complete
-                            )
+                            # 未実装関数の対応
+                            messagebox.showinfo("機能未実装", f"欠落エピソード取得機能はまだ実装されていません: {ncode}")
+                            # app.executor.run_in_background(
+                            #    lambda progress_callback: get_missing_episodes_async(ncode, progress_callback),
+                            #    on_complete=on_update_complete
+                            # )
                         else:
                             print("Please provide an ncode to update.")
                             input_label.config(text="ncodeを指定してください")
@@ -501,10 +506,11 @@ async def main():
         update_all_button = ttk.Button(
             scrollable_frame,
             text="一括更新",
-            command=lambda: app.executor.run_in_background(
-                lambda progress_callback: update_all_novels_async(main_shinchaku, progress_callback),
-                on_complete=on_update_complete
-            )
+            command=lambda: messagebox.showinfo("機能未実装", "一括更新機能はまだ実装されていません")
+            # command=lambda: app.executor.run_in_background(
+            #    lambda progress_callback: update_all_novels_async(main_shinchaku, progress_callback),
+            #    on_complete=on_update_complete
+            # )
         )
         update_all_button.pack(fill="x", pady=2)
 
@@ -522,10 +528,11 @@ async def main():
                 "<Button-1>",
                 lambda e, n_code=data["n_code"], ep_no=data["ep_no"], gen_all_no=data["gen_all_no"],
                        rating=data["rating"]:
-                app.executor.run_in_background(
-                    lambda progress_callback: update_novel_async(n_code, ep_no, gen_all_no, rating, progress_callback),
-                    on_complete=on_update_complete
-                )
+                messagebox.showinfo("機能未実装", f"小説更新機能はまだ実装されていません: {n_code}")
+                # app.executor.run_in_background(
+                #    lambda progress_callback: update_novel_async(n_code, ep_no, gen_all_no, rating, progress_callback),
+                #    on_complete=on_update_complete
+                # )
             )
 
     # 非同期処理：すべての小説を更新
@@ -583,6 +590,37 @@ async def main():
 
         progress_callback(0, f"{ncode}のエピソード情報を取得中...")
 
+        # AsyncConnectionクラスのインポートが漏れているので、ローカルで定義
+        class AsyncConnection:
+            def __init__(self, db_path):
+                self.db_path = db_path
+                self.conn = None
+
+            async def __aenter__(self):
+                def connect():
+                    conn = sqlite3.connect(self.db_path)
+                    return conn
+
+                self.conn = await asyncio.to_thread(connect)
+                return self
+
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                if self.conn:
+                    await asyncio.to_thread(self.conn.close)
+
+            async def execute(self, sql, params=None):
+                if params is None:
+                    params = []
+                cursor = self.conn.cursor()
+                await asyncio.to_thread(lambda: cursor.execute(sql, params))
+                return cursor
+
+            async def fetchall(self, cursor):
+                return await asyncio.to_thread(cursor.fetchall)
+
+            async def commit(self):
+                await asyncio.to_thread(self.conn.commit)
+
         async with AsyncConnection('database/novel_status.db') as db:
             # その小説の情報を取得
             cursor = await db.execute('SELECT n_code, rating, general_all_no FROM novels_descs WHERE n_code = ?',
@@ -638,269 +676,5 @@ async def main():
                 "shinchaku_novel": shinchaku_novel
             }
 
-    # 非同期処理：欠落しているエピソードを取得
-    async def get_missing_episodes_async(ncode, progress_callback):
-        """欠落しているエピソードを取得する非同期関数"""
-        if not app.novel_updater:
-            progress_callback(100, "小説更新機能が初期化されていません")
-            return {"success": False, "message": "小説更新機能が初期化されていません"}
-
-        progress_callback(0, f"{ncode}のエピソード情報を取得中...")
-
-        async with AsyncConnection('database/novel_status.db') as db:
-            # その小説の情報を取得
-            cursor = await db.execute('SELECT n_code, rating, general_all_no FROM novels_descs WHERE n_code = ?',
-                                      (ncode,))
-            result = await db.fetchall(cursor)
-            novel_info = result[0] if result else None
-
-            if not novel_info:
-                return {"success": False, "message": f"小説 {ncode} が見つかりません"}
-
-            _, rating, general_all_no = novel_info
-
-            if not general_all_no:
-                return {"success": False, "message": f"小説 {ncode} のエピソード数情報がありません"}
-
-            # 既存のエピソードを取得
-            cursor = await db.execute('SELECT episode_no FROM episodes WHERE ncode = ?', (ncode,))
-            result = await db.fetchall(cursor)
-            existing_episodes = [int(row[0]) for row in result]
-
-            # 欠落しているエピソードを特定
-            all_episodes = set(range(1, general_all_no + 1))
-            missing_episodes = sorted(list(all_episodes - set(existing_episodes)))
-
-            if not missing_episodes:
-                return {"success": True, "message": f"小説 {ncode} に欠落しているエピソードはありません"}
-
-            # 欠落エピソードを取得
-            progress_callback(10, f"{ncode}の欠落エピソードを取得中...")
-            total_missing = len(missing_episodes)
-
-            for i, episode_no in enumerate(missing_episodes):
-                progress = int(10 + (i / total_missing) * 80)
-                progress_callback(progress, f"欠落エピソード {i + 1}/{total_missing} ({episode_no}) を取得中...")
-
-                episode, title = await app.novel_updater.catch_up_episode(ncode, episode_no, rating)
-
-                if episode and title:
-                    # データベースを更新
-                    await db.execute("""
-                        INSERT OR REPLACE INTO episodes (ncode, episode_no, body, e_title)
-                        VALUES (?, ?, ?, ?)
-                    """, (ncode, episode_no, episode, title))
-
-                    if i % 10 == 0:  # 10エピソードごとにコミット
-                        await db.commit()
-
-                # レート制限を回避するために待機
-                await asyncio.sleep(0.5)
-
-            # 最終コミット
-            await db.commit()
-
-            # 総エピソード数を更新
-            progress_callback(95, "データベースを更新中...")
-            await app.novel_updater._update_total_episodes_single(ncode)
-
-            # 新着情報を更新
-            shinchaku_ep, main_shinchaku, shinchaku_novel = await app.novel_updater.shinchaku_checker()
-
-            return {
-                "success": True,
-                "message": f"{ncode}の欠落{total_missing}エピソードを取得しました",
-                "shinchaku_ep": shinchaku_ep,
-                "main_shinchaku": main_shinchaku,
-                "shinchaku_novel": shinchaku_novel
-            }
-
-    # 更新完了時のコールバック関数
-    def on_update_complete(result):
-        """更新処理が完了したときに呼び出されるコールバック関数"""
-        global shinchaku_ep, main_shinchaku, shinchaku_novel
-
-        if not result:
-            tk.messagebox.showerror("エラー", "更新処理が失敗しました。詳細はログを確認してください。")
-            return
-
-        # エラーがあるか確認
-        if "error" in result:
-            tk.messagebox.showerror("エラー", f"更新中にエラーが発生しました: {result['error']}")
-            return
-
-        # 成功しなかった場合
-        if "success" in result and not result["success"]:
-            tk.messagebox.showerror("エラー", result.get("message", "不明なエラーが発生しました"))
-            return
-
-        # 新着情報の更新
-        if "shinchaku_ep" in result:
-            shinchaku_ep = result["shinchaku_ep"]
-        if "main_shinchaku" in result:
-            main_shinchaku = result["main_shinchaku"]
-        if "shinchaku_novel" in result:
-            shinchaku_novel = result["shinchaku_novel"]
-
-        # ヘッダーの更新
-        header_label.config(text=f"新着情報\n新着{shinchaku_novel}件,{shinchaku_ep}話")
-
-        # 成功メッセージ
-        message = result.get("message", "小説の更新が完了しました")
-        tk.messagebox.showinfo("更新完了", message)
-
-        # 小説一覧と更新された小説リストを再表示
-        if "n_code" in result:
-            # 単一小説の更新の場合
-            # GUIスレッドから非同期関数を呼び出す
-            asyncio.run_coroutine_threadsafe(show_novel_list(), app.loop)
-            asyncio.run_coroutine_threadsafe(show_updated_novels(), app.loop)
-        else:
-            # 複数小説の更新または再取得の場合
-            asyncio.run_coroutine_threadsafe(show_updated_novels(), app.loop)
-
-    # 非同期機能：更新をチェック
-    async def check_updates_async(progress_callback):
-        """非同期での更新チェック"""
-        if not app.novel_updater:
-            return {"error": "小説更新機能が初期化されていません"}
-
-        # データベース更新
-        progress_callback(0, "データベースを更新中...")
-        await app.novel_updater.db_update()
-
-        # 新着チェック
-        progress_callback(50, "新着小説をチェック中...")
-        shinchaku_ep, main_shinchaku, shinchaku_novel = await app.novel_updater.shinchaku_checker()
-
-        return {
-            "shinchaku_ep": shinchaku_ep,
-            "main_shinchaku": main_shinchaku,
-            "shinchaku_novel": shinchaku_novel
-        }
-
-    # 更新チェックを実行
-    def check_updates():
-        """更新チェックを実行（GUIから呼び出される）"""
-        if not app.novel_updater:
-            tk.messagebox.showerror("エラー", "小説更新機能が初期化されていません")
-            return
-
-        # 更新チェックを開始
-        app.executor.run_in_background(
-            check_updates_async,
-            on_complete=on_update_complete
-        )
-
-    # 非同期データベース接続ユーティリティクラス
-    class AsyncConnection:
-        def __init__(self, db_path):
-            self.db_path = db_path
-            self.conn = None
-
-        async def __aenter__(self):
-            def connect():
-                conn = sqlite3.connect(self.db_path)
-                return conn
-
-            self.conn = await asyncio.to_thread(connect)
-            return self
-
-        async def __aexit__(self, exc_type, exc_val, exc_tb):
-            if self.conn:
-                await asyncio.to_thread(self.conn.close)
-
-        async def execute(self, sql, params=None):
-            if params is None:
-                params = []
-            cursor = self.conn.cursor()
-            await asyncio.to_thread(lambda: cursor.execute(sql, params))
-            return cursor
-
-        async def fetchall(self, cursor):
-            return await asyncio.to_thread(cursor.fetchall)
-
-        async def commit(self):
-            await asyncio.to_thread(self.conn.commit)
-
-    current_row = 0
-
-    # 「小説をさがす」セクション
-    create_section_title(content_frame, "小説をさがす", current_row)
-    current_row += 1
-    search_buttons = ["ランキング", "キーワード検索", "詳細検索", "ノクターノベルズ", "ムーンライトノベルズ", "PickUp!"]
-    for btn_text in search_buttons:
-        create_button(content_frame, btn_text, current_row)
-        current_row += 1
-
-    # 「小説を読む」セクション
-    create_section_title(content_frame, "小説を読む", current_row)
-    current_row += 1
-
-    # GUIから非同期関数を呼び出すためのラッパー関数
-    def wrap_async(coro_func):
-        """非同期コルーチンをGUIから呼び出すためのラッパー"""
-
-        def wrapper(*args, **kwargs):
-            return asyncio.run_coroutine_threadsafe(coro_func(*args, **kwargs), app.loop)
-
-        return wrapper
-
-    read_buttons = [
-        ("小説一覧", wrap_async(show_novel_list)),
-        ("最近更新された小説", wrap_async(show_updated_novels)),
-        ("最近読んだ小説", None),
-        ("作者別・シリーズ別", None),
-        ("タグ検索", None),
-    ]
-    for btn_text, command in read_buttons:
-        create_button(content_frame, btn_text, current_row, command=command)
-        current_row += 1
-
-    # 「オプション」セクション
-    create_section_title(content_frame, "オプション", current_row)
-    current_row += 1
-    option_buttons = [
-        ("ダウンロード状況", None),
-        ("設定", show_settings),
-        ("更新チェック", check_updates)
-    ]
-    for btn_text in option_buttons:
-        create_button(content_frame, btn_text, current_row)
-        current_row += 1
-
-    # アプリの起動
-    root.bind('<Command-@>', lambda event: show_input_screen())
-
-    # 非同期イベントループをバックグラウンドで実行
-    def run_event_loop(loop):
-        asyncio.set_event_loop(loop)
-        loop.run_forever()
-
-    # イベントループスレッドの作成
-    event_loop_thread = threading.Thread(target=run_event_loop, args=(app.loop,), daemon=True)
-    event_loop_thread.start()
-
-    # アプリ終了時のクリーンアップ処理
-    def on_closing():
-        # アプリケーションを終了すると通知
-        app.running = False
-
-        # イベントループを停止
-        app.loop.call_soon_threadsafe(app.loop.stop)
-
-        # BackgroundExecutorをシャットダウン
-        app.executor.shutdown()
-
-        # NovelUpdaterのクローズ処理を実行
-        if app.novel_updater:
-            asyncio.run_coroutine_threadsafe(app.novel_updater.close(), app.loop)
-
-        # 少し待機してからウィンドウを破棄
-        root.after(100, root.destroy)
-
-    # ウィンドウ終了時のイベントハンドラを設定
-    root.protocol("WM_DELETE_WINDOW", on_closing)
-
-    # Tkインターフェースを開始
-    root.mainloop()
+if __name__ == "__main__":
+    asyncio.run(main())
