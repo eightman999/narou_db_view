@@ -15,6 +15,8 @@ async def run_in_thread(func, *args, **kwargs):
 
 
 # 非同期データベース接続のコンテキストマネージャ
+# async_bookshelf.py の AsyncConnection クラスを修正
+
 class AsyncConnection:
     def __init__(self, db_path):
         self.db_path = db_path
@@ -33,9 +35,14 @@ class AsyncConnection:
         """SQL実行用の非同期メソッド"""
         if params is None:
             params = []
-        cursor = self.conn.cursor()
-        await run_in_thread(cursor.execute, sql, params)
-        return cursor
+
+        # カーソルの作成とSQL実行を同じスレッドで行う
+        def execute_sql():
+            cursor = self.conn.cursor()
+            cursor.execute(sql, params)
+            return cursor
+
+        return await run_in_thread(execute_sql)
 
     async def fetchall(self, cursor):
         """カーソルから全ての結果を取得する非同期メソッド"""
@@ -44,7 +51,6 @@ class AsyncConnection:
     async def commit(self):
         """変更をコミットする非同期メソッド"""
         await run_in_thread(self.conn.commit)
-
 
 # Connect to the database
 async def shelf_maker():

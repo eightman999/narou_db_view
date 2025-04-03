@@ -787,3 +787,4 @@
 2025-03-02 18:38:55,726 - async_checker - INFO - New episode found in n6946fj: 635 -> 759
 2025-03-02 18:38:55,741 - async_checker - INFO - Shinchaku: 147åè28033òb
 2025-04-03 21:35:20,910 - background_executor - INFO - Async loop initialized in background thread
+2025-04-03 21:42:26,763 - background_executor - INFO - Async loop initialized in background thread

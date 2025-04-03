@@ -6,7 +6,10 @@
   <component name="ChangeListManager">
     <list default="true" id="bad1a08a-9700-4753-8d26-2a6749864910" name="変更" comment="っっl">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main_view_async.py" beforeDir="false" afterPath="$PROJECT_DIR$/main_view_async.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/async_bookshelf.py" beforeDir="false" afterPath="$PROJECT_DIR$/async_bookshelf.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/async_episode_count.py" beforeDir="false" afterPath="$PROJECT_DIR$/async_episode_count.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/async_novel_updates.log" beforeDir="false" afterPath="$PROJECT_DIR$/async_novel_updates.log" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/async_recover_novels.py" beforeDir="false" afterPath="$PROJECT_DIR$/async_recover_novels.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -267,7 +270,7 @@
       <workItem from="1740796428880" duration="1550000" />
       <workItem from="1740826495002" duration="23000" />
       <workItem from="1740869501316" duration="11797000" />
-      <workItem from="1743680616272" duration="2714000" />
+      <workItem from="1743680616272" duration="3406000" />
     </task>
     <task id="LOCAL-00001" summary="っっl">
       <option name="closed" value="true" />
@@ -295,7 +298,7 @@
     <SUITE FILE_PATH="coverage/narou_db_view$Del_Duplication.coverage" NAME="Del_Duplication のカバレッジ結果" MODIFIED="1740914716409" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$delete_two_tag.coverage" NAME="delete_two_tag のカバレッジ結果" MODIFIED="1733821143452" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_view$first_formatter.coverage" NAME="first_formatter のカバレッジ結果" MODIFIED="1740914352973" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/narou_db_view$main_view_async.coverage" NAME="main_view_async のカバレッジ結果" MODIFIED="1743683416361" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/narou_db_view$main_view_async.coverage" NAME="main_view_async のカバレッジ結果" MODIFIED="1743684144726" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$main_view.coverage" NAME="main_view のカバレッジ結果" MODIFIED="1740473074596" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_view$AsyncConnection.coverage" NAME="AsyncConnection のカバレッジ結果" MODIFIED="1743682582024" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$checker.coverage" NAME="checker のカバレッジ結果" MODIFIED="1740469049707" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
