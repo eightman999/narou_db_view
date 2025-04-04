@@ -5,7 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="bad1a08a-9700-4753-8d26-2a6749864910" name="変更" comment="っっl">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/checker.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/checker.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/settings.ini" beforeDir="false" afterPath="$PROJECT_DIR$/core/settings.ini" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -63,6 +66,7 @@
     "Python.first_LR.executor": "Run",
     "Python.first_formatter.executor": "Run",
     "Python.first_last_update.executor": "Run",
+    "Python.main.executor": "Run",
     "Python.main_view.executor": "Run",
     "Python.main_view_async.executor": "Run",
     "Python.makeEPUB.executor": "Run",
@@ -76,7 +80,7 @@
     "git-widget-placeholder": "master",
     "ignore.virus.scanning.warn.message": "true",
     "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "D:/趣味/data analyzer",
+    "last_opened_file_path": "D:/趣味/narou_db_view/database/db_files",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -93,10 +97,12 @@
 }]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\趣味\narou_db_view\database\db_files" />
       <recent name="$PROJECT_DIR$/fonts" />
       <recent name="$PROJECT_DIR$/database" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="D:\趣味\narou_db_view\core" />
       <recent name="D:\趣味\narou_db_view" />
       <recent name="$PROJECT_DIR$/database" />
     </key>
@@ -249,7 +255,7 @@
       <workItem from="1740826495002" duration="23000" />
       <workItem from="1740869501316" duration="11797000" />
       <workItem from="1743680616272" duration="3710000" />
-      <workItem from="1743767941170" duration="2563000" />
+      <workItem from="1743767941170" duration="3906000" />
     </task>
     <task id="LOCAL-00001" summary="っっl">
       <option name="closed" value="true" />
@@ -296,5 +302,6 @@
     <SUITE FILE_PATH="coverage/narou_db_formatter$makeEPUB.coverage" NAME="makeEPUB のカバレッジ結果" MODIFIED="1734875569290" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$ep_no_fomatter.coverage" NAME="ep_no_fomatter のカバレッジ結果" MODIFIED="1733837104868" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$existence_checker.coverage" NAME="existence_checker のカバレッジ結果" MODIFIED="1740465795719" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/narou_db_view$main.coverage" NAME="main のカバレッジ結果" MODIFIED="1743772522821" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core" />
   </component>
 </project>

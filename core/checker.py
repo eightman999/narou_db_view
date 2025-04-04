@@ -34,16 +34,70 @@ USER_AGENTS = [
     'Mozilla/5.0 (iPhone; CPU iPhone OS 10_3_1 like Mac OS X) AppleWebKit/603.1.30 (KHTML, like Gecko) Version/10.0 Mobile/14E304 Safari/602.1'
 ]
 
-def load_conf():
-    config = configparser.ConfigParser()
-    config.read('settings.ini')
 
-    font = config.get('Settings', 'font')
-    fontsize = config.getint('Settings', 'fontsize')
-    backgroundcolor = config.get('Settings', 'backgroundcolor')
+def load_conf():
+    import os
+    config = configparser.ConfigParser()
+
+    # 設定ファイルのパス
+    config_file = 'settings.ini'
+
+    # デフォルト設定
+    default_font = "YuKyokasho Yoko"
+    default_fontsize = 14
+    default_backgroundcolor = "#FFFFFF"
+
+    # 設定ファイルが存在するか確認
+    if os.path.exists(config_file):
+        config.read(config_file)
+
+    # Settings セクションが存在しない場合は作成
+    if not config.has_section('Settings'):
+        config.add_section('Settings')
+        config.set('Settings', 'font', default_font)
+        config.set('Settings', 'fontsize', str(default_fontsize))
+        config.set('Settings', 'backgroundcolor', default_backgroundcolor)
+
+        # 設定を保存
+        with open(config_file, 'w') as f:
+            config.write(f)
+
+        return default_font, default_fontsize, default_backgroundcolor
+
+    # 設定を読み込み
+    try:
+        font = config.get('Settings', 'font')
+        fontsize = config.getint('Settings', 'fontsize')
+        backgroundcolor = config.get('Settings', 'backgroundcolor')
+    except (configparser.NoOptionError, ValueError):
+        # オプションが存在しないか、値の変換に失敗した場合はデフォルト値を使用
+        if not config.has_option('Settings', 'font'):
+            config.set('Settings', 'font', default_font)
+            font = default_font
+        else:
+            font = config.get('Settings', 'font')
+
+        if not config.has_option('Settings', 'fontsize'):
+            config.set('Settings', 'fontsize', str(default_fontsize))
+            fontsize = default_fontsize
+        else:
+            try:
+                fontsize = config.getint('Settings', 'fontsize')
+            except ValueError:
+                config.set('Settings', 'fontsize', str(default_fontsize))
+                fontsize = default_fontsize
+
+        if not config.has_option('Settings', 'backgroundcolor'):
+            config.set('Settings', 'backgroundcolor', default_backgroundcolor)
+            backgroundcolor = default_backgroundcolor
+        else:
+            backgroundcolor = config.get('Settings', 'backgroundcolor')
+
+        # 変更された設定を保存
+        with open(config_file, 'w') as f:
+            config.write(f)
 
     return font, fontsize, backgroundcolor
-
 
 #0:作者によって削除 1:18禁 2:通常 4:作者退会&&作者によって削除
 def existence_check(ncode):
@@ -127,11 +181,11 @@ def update_check(ncode, rating):
         print(f"Failed to download file: {response.status_code}")
 
 def Thawing_gz():
-    dl_dir = 'dl'
+    dl_dir = DOWNLOAD_DIR
     for filename in os.listdir(dl_dir):
         if filename.endswith('.gz'):
             gz_path = os.path.join(dl_dir, filename)
-            yml_path = os.path.join('yml', filename[:-3] + '.yml')
+            yml_path = os.path.join(YML_DIR, filename[:-3] + '.yml')
 
             with gzip.open(gz_path, 'rt', encoding='utf-8') as gz_file:
                 content = gz_file.read()
@@ -144,7 +198,7 @@ def Thawing_gz():
 
 
 def db_update():
-    conn = sqlite3.connect(conn = sqlite3.connect(DATABASE_PATH))
+    conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     print("Connected to database")
     cursor.execute("SELECT n_code, rating FROM novels_descs")
@@ -169,7 +223,7 @@ def db_update():
 
 
 def yml_parse_time(n_codes_ratings):
-    conn = sqlite3.connect('database/novel_status.db')
+    conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     print("Connected to database")
 
@@ -181,7 +235,7 @@ def yml_parse_time(n_codes_ratings):
 
     for n_code, _ in n_codes_ratings:
         print(f"Updating {n_code}...")
-        yml_path = os.path.join('yml', f"{n_code}.yml")
+        yml_path = os.path.join(YML_DIR, f"{n_code}.yml")
 
         # ファイルパスの確認
         print(f"Looking for file: {yml_path}")
@@ -263,7 +317,7 @@ def yml_parse_time(n_codes_ratings):
 
 def ncode_title(n_code):
     # Connect to the database
-    conn = sqlite3.connect('database/novel_status.db')
+    conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
 
     # Select the title from the novels_descs table
@@ -291,7 +345,7 @@ def shinchaku_checker():
     shinchaku_novel_no = 0
     print("Check_shinchaku...")
 
-    conn = sqlite3.connect('database/novel_status.db')
+    conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     print("Connected to database")
 
@@ -443,7 +497,7 @@ def single_episode(n_code, rating):
 def new_episode(n_code, past_ep, general_all_no, rating):
     new_eps = []
     print(f"Checking {n_code}...")
-    conn = sqlite3.connect('database/novel_status.db')
+    conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     print("Connected to database")
 

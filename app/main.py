@@ -1,7 +1,6 @@
 import configparser
 import tkinter as tk
 from tkinter import ttk, scrolledtext
-from bookshelf import shelf_maker, get_last_read, episode_getter, input_last_read
 from bs4 import BeautifulSoup
 from PIL import ImageFont, Image, ImageDraw, ImageTk
 import tkinter.font as tkFont
@@ -11,7 +10,7 @@ from core.checker import load_conf, db_update, shinchaku_checker, new_episode, d
 from database.operations import update_total_episodes_single, update_total_episodes
 
 global scrollable_frame, scroll_canvas
-main_sehelf = []
+main_shelf = []
 last_read_novel = []
 episodes = []
 last_read_epno = 0
@@ -23,15 +22,15 @@ shinchaku_novel = 0
 main_shinchaku = []
 
 
-def main(main_sehelf=None, last_read_novel=None, last_read_epno=0,
+def main(main_shelf=None, last_read_novel=None, last_read_epno=0,
          set_font="YuKyokasho Yoko", novel_fontsize=14, bg_color="#FFFFFF",
          shinchaku_ep=0, main_shinchaku=None, shinchaku_novel=0):
     # グローバル変数の設定
     global scrollable_frame, scroll_canvas
 
     # 引数がNoneの場合のデフォルト値設定
-    if main_sehelf is None:
-        main_sehelf = []
+    if main_shelf is None:
+        main_shelf = []
     if last_read_novel is None:
         last_read_novel = []
     if main_shinchaku is None:
@@ -143,7 +142,7 @@ def main(main_sehelf=None, last_read_novel=None, last_read_epno=0,
         # Prepare the data structure
         buttons_data = [
             {"title": f"読む", "text": f"{row[1]} - 作者: {row[2]}", "n_code": row[0]}
-            for row in main_sehelf
+            for row in main_shelf
         ]
 
         # Draw all buttons
@@ -366,7 +365,7 @@ def main(main_sehelf=None, last_read_novel=None, last_read_epno=0,
                     input_text.delete("1.0", tk.END)
             elif "n" in user_input:
                 ncode = user_input
-                input_label.config(text= "ncode:"+ncode +"title:"+main_sehelf[int(ncode)][1])
+                input_label.config(text= "ncode:"+ncode +"title:"+main_shelf[int(ncode)][1])
             else:
                 input_label.config(text=f"User input: {user_input}")
                 input_text.delete("1.0", tk.END)
@@ -492,8 +491,8 @@ def main(main_sehelf=None, last_read_novel=None, last_read_epno=0,
 if __name__ == "__main__":
     dell_dl()
     del_yml()
-    main_sehelf = shelf_maker()
-    last_read_novel,last_read_epno = get_last_read(main_sehelf)
+    main_shelf = shelf_maker()
+    last_read_novel,last_read_epno = get_last_read(main_shelf)
     set_font, novel_fontsize, bg_color = load_conf()
     db_update()
     shinchaku_ep, main_shinchaku,shinchaku_novel = shinchaku_checker()
