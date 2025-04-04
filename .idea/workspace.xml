@@ -5,18 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="bad1a08a-9700-4753-8d26-2a6749864910" name="変更" comment="っっl">
-      <change afterPath="$PROJECT_DIR$/database/db_handler.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tools/episode_fetcher.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/bookshelf.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/bookshelf.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/checker.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/checker.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/database/operations.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tools/data_cleanup/remove_duplicates.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tools/recovery/existence_checker.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tools/recovery/recover_novel.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/exporters/epub_exporter.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/exporters/txt_exporter.py" beforeDir="false" afterPath="$PROJECT_DIR$/utils/exporters/txt_exporter.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -264,7 +254,7 @@
       <workItem from="1740826495002" duration="23000" />
       <workItem from="1740869501316" duration="11797000" />
       <workItem from="1743680616272" duration="3710000" />
-      <workItem from="1743767941170" duration="5773000" />
+      <workItem from="1743767941170" duration="6573000" />
     </task>
     <task id="LOCAL-00001" summary="っっl">
       <option name="closed" value="true" />
@@ -311,6 +301,6 @@
     <SUITE FILE_PATH="coverage/narou_db_formatter$makeEPUB.coverage" NAME="makeEPUB のカバレッジ結果" MODIFIED="1734875569290" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$ep_no_fomatter.coverage" NAME="ep_no_fomatter のカバレッジ結果" MODIFIED="1733837104868" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$existence_checker.coverage" NAME="existence_checker のカバレッジ結果" MODIFIED="1740465795719" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/narou_db_view$main.coverage" NAME="main のカバレッジ結果" MODIFIED="1743772669980" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core" />
+    <SUITE FILE_PATH="coverage/narou_db_view$main.coverage" NAME="main のカバレッジ結果" MODIFIED="1743775294309" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core" />
   </component>
 </project>

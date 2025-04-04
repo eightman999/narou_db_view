@@ -243,9 +243,9 @@ def show_settings():
     bg_entry.grid(row=2, column=1, sticky="ew", pady=5)
 
     # 適用ボタン
+
     def apply_settings():
-        nonlocal novel_fontsize
-        global set_font, bg_color
+        global novel_fontsize, set_font, bg_color  # nonlocalをglobalに変更
 
         novel_fontsize = size_var.get()
         set_font = font_var.get()
@@ -266,9 +266,8 @@ def show_settings():
             config.write(configfile)
 
         messagebox.showinfo("設定", "設定が適用されました")
-
-    apply_button = ttk.Button(setting_frame, text="適用", command=apply_settings)
-    apply_button.grid(row=3, column=0, columnspan=2, pady=10)
+        apply_button = ttk.Button(setting_frame, text="適用", command=apply_settings)
+        apply_button.grid(row=3, column=0, columnspan=2, pady=10)
 
 
 def show_input_screen():
