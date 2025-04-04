@@ -18,7 +18,14 @@ if __name__ == "__main__":
     db_update()
     shinchaku_ep, main_shinchaku, shinchaku_novel = shinchaku_checker()
 
-    # アプリケーション実行
-    main(main_shelf, last_read_novel, last_read_epno,
-         set_font, novel_fontsize, bg_color,
-         shinchaku_ep, main_shinchaku, shinchaku_novel)
+    main(
+        main_shelf=main_shelf,
+        last_read_novel=last_read_novel,
+        last_read_epno=last_read_epno,
+        set_font=set_font,
+        novel_fontsize=novel_fontsize,
+        bg_color=bg_color,
+        shinchaku_ep=shinchaku_ep,
+        main_shinchaku=main_shinchaku,
+        shinchaku_novel=shinchaku_novel
+    )

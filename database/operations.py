@@ -1,8 +1,8 @@
 import sqlite3
-
+from config import DATABASE_PATH
 def update_total_episodes():
     # Connect to the SQLite database
-    conn = sqlite3.connect('database/novel_status.db')
+    conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
 
     # Add the total_ep column to the novels_descs table if it doesn't exist
@@ -24,7 +24,7 @@ def update_total_episodes():
 
 def update_total_episodes_single(ncode):
     # Connect to the SQLite database
-    conn = sqlite3.connect('database/novel_status.db')
+    conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     print(f"Updating {ncode}'s episodes")
 

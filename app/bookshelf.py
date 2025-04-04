@@ -9,7 +9,7 @@ from config import DATABASE_PATH
 
 # Connect to the database
 def shelf_maker():
-    conn = sqlite3.connect('database/novel_status.db')
+    conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
 
     # Select data from novels_descs table
@@ -55,7 +55,7 @@ def shelf_maker():
 
 def input_last_read(rast_read_novel, episode_no):
     # Connect to the database
-    conn = sqlite3.connect('database/novel_status.db')
+    conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
 
     # Create the rast_read_novel table if it does not exist
@@ -82,7 +82,7 @@ def input_last_read(rast_read_novel, episode_no):
 
 def get_last_read(shelf):
     # Connect to the database
-    conn = sqlite3.connect('database/novel_status.db')
+    conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
 
     # Select the last read novel from the rast_read_novel table
@@ -110,7 +110,7 @@ def get_last_read(shelf):
     return None, None
 def episode_getter(n_code):
     # Connect to the database
-    conn = sqlite3.connect('database/novel_status.db')
+    conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
 
     # Select the episode_no and e_title from the novels_episodes table

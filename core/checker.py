@@ -14,6 +14,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 import random
 
+from config import DATABASE_PATH, DOWNLOAD_DIR, YML_DIR
 
 USER_AGENTS = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
@@ -143,7 +144,7 @@ def Thawing_gz():
 
 
 def db_update():
-    conn = sqlite3.connect('database/novel_status.db')
+    conn = sqlite3.connect(conn = sqlite3.connect(DATABASE_PATH))
     cursor = conn.cursor()
     print("Connected to database")
     cursor.execute("SELECT n_code, rating FROM novels_descs")
@@ -483,21 +484,21 @@ def new_episode(n_code, past_ep, general_all_no, rating):
     print(f"Updated {n_code} with new episodes and total_ep.")
 
 def dell_dl():
-    dl_dir = 'dl'
+    dl_dir = DOWNLOAD_DIR
     for filename in os.listdir(dl_dir):
         if filename.endswith('.gz') or filename.endswith('.yml'):
             os.remove(os.path.join(dl_dir, filename))
             print(f"Deleted {filename}")
 
 def del_yml():
-    yml_dir = 'yml'
+    yml_dir = YML_DIR
     for filename in os.listdir(yml_dir):
         if filename.endswith('.yml'):
             os.remove(os.path.join(yml_dir, filename))
             print(f"Deleted {filename}")
 
 def existence_checker():
-    conn = sqlite3.connect('database/novel_status.db')
+    conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     print("Connected to database")
 

@@ -21,7 +21,21 @@ bg_color = "#FFFFFF"
 shinchaku_ep = 0
 shinchaku_novel = 0
 main_shinchaku = []
-def main():
+
+
+def main(main_sehelf=None, last_read_novel=None, last_read_epno=0,
+         set_font="YuKyokasho Yoko", novel_fontsize=14, bg_color="#FFFFFF",
+         shinchaku_ep=0, main_shinchaku=None, shinchaku_novel=0):
+    # グローバル変数の設定
+    global scrollable_frame, scroll_canvas
+
+    # 引数がNoneの場合のデフォルト値設定
+    if main_sehelf is None:
+        main_sehelf = []
+    if last_read_novel is None:
+        last_read_novel = []
+    if main_shinchaku is None:
+        main_shinchaku = []
     # メインウィンドウの設定
     root = tk.Tk()
     root.title("小説アプリ")
