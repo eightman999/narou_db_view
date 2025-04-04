@@ -1,4 +1,6 @@
 import configparser
+import sqlite3
+import time
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
 from bs4 import BeautifulSoup
@@ -65,22 +67,23 @@ def update_progress():
 
 # 小説リストを表示する関数
 def show_novel_list():
-    """小説一覧を表示する"""
-    global scrollable_frame, scroll_canvas, main_shelf, list_frame
+    """小説一覧を表示する（最適化版）"""
+    global scrollable_frame, scroll_canvas, main_shelf, list_frame, current_page, items_per_page
 
     # 既存のウィジェットをクリア
     for widget in list_frame.winfo_children():
         widget.destroy()
 
-    # スクロールキャンバスとフレームを初期化
+    # 定数の定義
+    ITEMS_PER_PAGE = 100  # 一度に表示する項目数
+    current_page = 0
+    total_items = len(main_shelf)
+    total_pages = (total_items + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE  # 切り上げ除算
+
+    # キャンバスとスクロールバーの設定
     scroll_canvas = tk.Canvas(list_frame, bg="#F0F0F0")
     scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=scroll_canvas.yview)
     scrollable_frame = ttk.Frame(scroll_canvas)
-
-    scrollable_frame.bind(
-        "<Configure>",
-        lambda e: scroll_canvas.configure(scrollregion=scroll_canvas.bbox("all"))
-    )
 
     scroll_canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
     scroll_canvas.configure(yscrollcommand=scrollbar.set)
@@ -88,24 +91,100 @@ def show_novel_list():
     scroll_canvas.pack(side="left", fill="both", expand=True)
     scrollbar.pack(side="right", fill="y")
 
-    # データ構造を準備
-    buttons_data = [
-        {"title": f"読む", "text": f"{row[1]} - 作者: {row[2]}", "n_code": row[0]}
-        for row in main_shelf
-    ]
+    # ページングコントロールフレーム
+    paging_frame = tk.Frame(scrollable_frame, bg="#F0F0F0")
+    paging_frame.pack(fill="x", pady=5)
 
-    # すべてのボタンを描画
-    for data in buttons_data:
-        frame = tk.Frame(scrollable_frame, bg="#F0F0F0")
-        frame.pack(fill="x", pady=2)
+    # 前のページボタン
+    prev_button = ttk.Button(paging_frame, text="前へ", command=lambda: load_page(current_page - 1))
+    prev_button.pack(side="left", padx=5)
 
-        # タイトルラベル
-        title_label = tk.Label(frame, text=data["text"], bg="#F0F0F0", anchor="w")
-        title_label.pack(side="left", padx=5, fill="x", expand=True)
+    # ページ表示ラベル
+    page_label = tk.Label(paging_frame, text=f"ページ {current_page + 1}/{total_pages}", bg="#F0F0F0")
+    page_label.pack(side="left", padx=5)
 
-        # クリックイベントをラベルにバインド
-        title_label.bind("<Button-1>", lambda e, n_code=data["n_code"]: on_title_click(e, n_code))
+    # 次のページボタン
+    next_button = ttk.Button(paging_frame, text="次へ", command=lambda: load_page(current_page + 1))
+    next_button.pack(side="left", padx=5)
 
+    # リスト表示フレーム
+    list_display_frame = tk.Frame(scrollable_frame, bg="#F0F0F0")
+    list_display_frame.pack(fill="x", expand=True)
+
+    # 小説リストを描画する関数（ページング対応）
+    def load_page(page_num):
+        nonlocal current_page
+
+        # ページ境界チェック
+        if page_num < 0 or page_num >= total_pages:
+            return
+
+        current_page = page_num
+
+        # 前のリストをクリア
+        for widget in list_display_frame.winfo_children():
+            widget.destroy()
+
+        # 現在のページに表示する項目の範囲を計算
+        start_idx = current_page * ITEMS_PER_PAGE
+        end_idx = min(start_idx + ITEMS_PER_PAGE, total_items)
+
+        # ページングラベルを更新
+        page_label.config(text=f"ページ {current_page + 1}/{total_pages}")
+
+        # 前/次ボタンの有効/無効状態を更新
+        prev_button.config(state=tk.NORMAL if current_page > 0 else tk.DISABLED)
+        next_button.config(state=tk.NORMAL if current_page < total_pages - 1 else tk.DISABLED)
+
+        # 現在のページの項目を表示
+        for i in range(start_idx, end_idx):
+            row = main_shelf[i]
+
+            # 項目用フレーム
+            item_frame = tk.Frame(list_display_frame, bg="#F0F0F0")
+            item_frame.pack(fill="x", pady=2)
+
+            # タイトルラベル
+            title_text = f"{row[1]} - 作者: {row[2]}"
+            title_label = tk.Label(item_frame, text=title_text, bg="#F0F0F0", anchor="w")
+            title_label.pack(side="left", padx=5, fill="x", expand=True)
+
+            # クリックイベント
+            title_label.bind("<Button-1>", lambda e, n_code=row[0]: on_title_click(e, n_code))
+
+    # 初期ページを読み込む
+    load_page(0)
+
+
+# スクロールイベント最適化
+def configure_scroll_event():
+    """スクロールイベントの最適化設定"""
+    global scroll_canvas
+
+    # スクロールイベントがトリガーされた回数を制限するための変数
+    last_scroll_time = 0
+    scroll_delay = 100  # ミリ秒単位
+
+    def throttled_scroll_event(event):
+        nonlocal last_scroll_time
+        current_time = int(time.time() * 1000)
+
+        # 前回のスクロールから一定時間経過していない場合はイベントを無視
+        if current_time - last_scroll_time < scroll_delay:
+            return "break"
+
+        last_scroll_time = current_time
+
+        # 通常のスクロール処理
+        if event.delta > 0:
+            scroll_canvas.yview_scroll(-1, "units")
+        else:
+            scroll_canvas.yview_scroll(1, "units")
+
+        return "break"
+
+    # マウスホイールイベントをバインド
+    scroll_canvas.bind_all("<MouseWheel>", throttled_scroll_event)
 
 def on_title_click(event, n_code):
     """小説タイトルがクリックされたときの処理"""
@@ -621,7 +700,7 @@ def main(main_shelf=None, last_read_novel=None, last_read_epno=0,
          set_font="YuKyokasho Yoko", novel_fontsize=14, bg_color="#FFFFFF",
          shinchaku_ep=0, main_shinchaku=None, shinchaku_novel=0):
     """
-    アプリケーションのメイン関数
+    アプリケーションのメイン関数（最適化版）
 
     Args:
         main_shelf (list): 小説の一覧
@@ -636,7 +715,10 @@ def main(main_shelf=None, last_read_novel=None, last_read_epno=0,
     """
     # グローバル変数として宣言
     global scrollable_frame, scroll_canvas, root, header_label, progress_label, list_frame
-    global update_in_progress
+    global update_in_progress, app_cache
+
+    # アプリケーションキャッシュ初期化
+    app_cache = NovelCache(cache_size=1000)
 
     # 引数がNoneの場合のデフォルト値設定
     if main_shelf is None:
@@ -656,3 +738,379 @@ def main(main_shelf=None, last_read_novel=None, last_read_epno=0,
     globals()['shinchaku_ep'] = shinchaku_ep
     globals()['main_shinchaku'] = main_shinchaku
     globals()['shinchaku_novel'] = shinchaku_novel
+
+    # rootウィンドウ作成
+    root = tk.Tk()
+    root.title("小説ビューア")
+    root.geometry("1000x600")
+
+    # tkinterのグローバル設定
+    ttk.Style().configure("TButton", font=(set_font, 10))
+
+    # 更新状態追跡用
+    update_in_progress = False
+
+    # メインフレーム
+    main_frame = tk.Frame(root)
+    main_frame.pack(fill="both", expand=True)
+
+    # 左サイドパネル
+    side_panel = tk.Frame(main_frame, width=200, bg="#E0E0E0")
+    side_panel.pack(side="left", fill="y")
+    side_panel.pack_propagate(False)  # サイズを固定
+
+    # ヘッダーラベル
+    header_label = tk.Label(
+        side_panel,
+        text=f"新着情報\n新着{shinchaku_novel}件,{shinchaku_ep}話",
+        bg="#E0E0E0",
+        font=(set_font, 12)
+    )
+    header_label.pack(pady=10)
+
+    # ボタンスタイル設定
+    button_style = {"width": 15, "font": (set_font, 10), "pady": 5}
+
+    # ボタン作成
+    novel_list_button = tk.Button(
+        side_panel,
+        text="小説一覧",
+        command=lambda: root.after(50, show_novel_list),  # 非同期実行
+        **button_style
+    )
+    novel_list_button.pack(pady=5)
+
+    updated_novels_button = tk.Button(
+        side_panel,
+        text="更新された小説",
+        command=lambda: root.after(50, show_updated_novels),
+        **button_style
+    )
+    updated_novels_button.pack(pady=5)
+
+    settings_button = tk.Button(
+        side_panel,
+        text="設定",
+        command=lambda: root.after(50, show_settings),
+        **button_style
+    )
+    settings_button.pack(pady=5)
+
+    input_button = tk.Button(
+        side_panel,
+        text="コマンド入力",
+        command=lambda: root.after(50, show_input_screen),
+        **button_style
+    )
+    input_button.pack(pady=5)
+
+    # 進捗状況ラベル
+    progress_label = tk.Label(side_panel, text="", bg="#E0E0E0", wraplength=180)
+    progress_label.pack(pady=10, side="bottom")
+
+    # メインコンテンツフレーム
+    list_frame = tk.Frame(main_frame, bg="#F0F0F0")
+    list_frame.pack(side="right", fill="both", expand=True)
+
+    # 処理能力の最適化
+    def optimize_performance():
+        # tkinterの描画更新頻度を調整
+        root.update_idletasks()
+
+        # GUIイベントを処理
+        root.update()
+
+        # メモリ使用状況を表示（デバッグ用）
+        if DEBUG_MODE:
+            import psutil
+            process = psutil.Process()
+            memory_info = process.memory_info()
+            print(f"Memory usage: {memory_info.rss / (1024 * 1024):.2f} MB")
+
+        # 定期的に実行
+        root.after(1000, optimize_performance)
+
+    # パフォーマンス最適化タスク開始
+    DEBUG_MODE = False  # デバッグモードフラグ
+    root.after(1000, optimize_performance)
+
+    # 初期表示
+    show_novel_list()
+
+    # イベントループ開始
+    root.mainloop()
+
+    # アプリケーション終了時の処理
+    db.close_all_connections()
+
+
+# データベースからの一括読み込みを避けるためのページング型小説一覧取得
+def get_novel_list_paged(page=0, items_per_page=100):
+    """
+    ページング処理を使用した小説一覧取得
+
+    Args:
+        page (int): ページ番号（0から開始）
+        items_per_page (int): 1ページあたりの項目数
+
+    Returns:
+        tuple: (小説リスト, 総ページ数)
+    """
+    # 総数を取得
+    count_query = 'SELECT COUNT(*) FROM novels_descs'
+    total_count = db.execute_query(count_query, fetch=True, fetch_all=False)[0]
+
+    # 総ページ数を計算
+    total_pages = (total_count + items_per_page - 1) // items_per_page
+
+    # 指定ページのデータを取得
+    offset = page * items_per_page
+    query = 'SELECT * FROM novels_descs ORDER BY updated_at DESC LIMIT ? OFFSET ?'
+    novels = db.execute_query(query, (items_per_page, offset), fetch=True)
+
+    return novels, total_pages
+
+
+# メインウィンドウ更新を最小限に抑えるヘルパー関数
+def schedule_ui_update(update_func, delay=100):
+    """
+    UI更新処理をスケジュールする
+
+    Args:
+        update_func (callable): UI更新関数
+        delay (int): 遅延時間（ミリ秒）
+    """
+    root.after(delay, update_func)
+
+
+# データベース接続プールを拡張して並列処理に対応
+class EnhancedDatabaseHandler(DatabaseHandler):
+    """拡張データベースハンドラクラス"""
+
+    def __init__(self):
+        super().__init__()
+        self._read_connection_pool = {}  # 読み取り専用接続プール
+
+    def get_read_connection(self):
+        """読み取り専用の接続を取得（並列処理対応）"""
+        thread_id = threading.get_ident()
+
+        if thread_id not in self._read_connection_pool:
+            conn = sqlite3.connect(self.db_path)
+            conn.execute('PRAGMA journal_mode=WAL')
+            conn.text_factory = str
+            # 読み取り専用モードを設定
+            conn.execute('PRAGMA query_only=ON')
+            self._read_connection_pool[thread_id] = conn
+
+        return self._read_connection_pool[thread_id]
+
+    def execute_read_query(self, query, params=None, fetch=True, fetch_all=True):
+        """読み取り専用クエリの実行（ロックなし）"""
+        conn = self.get_read_connection()
+        cursor = conn.cursor()
+
+        try:
+            if params is None:
+                cursor.execute(query)
+            else:
+                cursor.execute(query, params)
+
+            if fetch:
+                if fetch_all:
+                    return cursor.fetchall()
+                else:
+                    return cursor.fetchone()
+
+            return cursor.rowcount
+
+        except sqlite3.Error as e:
+            logger.error(f"読み取りクエリエラー: {e}, クエリ: {query}")
+            raise
+
+
+# キャッシュ関連のクラスと関数
+
+class NovelCache:
+    """小説データキャッシュクラス"""
+
+    def __init__(self, cache_size=500):
+        self.cache = {}  # {ncode: novel_data}
+        self.cache_size = cache_size
+        self.access_times = {}  # {ncode: last_access_time}
+
+    def get(self, ncode):
+        """キャッシュからデータを取得"""
+        if ncode in self.cache:
+            self.access_times[ncode] = time.time()
+            return self.cache[ncode]
+        return None
+
+    def put(self, ncode, data):
+        """キャッシュにデータを格納"""
+        # キャッシュがいっぱいの場合、最も古いエントリを削除
+        if len(self.cache) >= self.cache_size:
+            oldest_ncode = min(self.access_times.items(), key=lambda x: x[1])[0]
+            del self.cache[oldest_ncode]
+            del self.access_times[oldest_ncode]
+
+        self.cache[ncode] = data
+        self.access_times[ncode] = time.time()
+
+    def clear(self):
+        """キャッシュをクリア"""
+        self.cache.clear()
+        self.access_times.clear()
+
+
+# 最適化されたデータベース取得関数
+def get_optimized_novel_list(offset=0, limit=100):
+    """
+    ページング処理を使用して最適化された小説リストを取得
+
+    Args:
+        offset (int): 開始位置
+        limit (int): 取得する最大項目数
+
+    Returns:
+        list: 小説データのリスト
+    """
+    # キャッシュキー
+    cache_key = f"novel_list_{offset}_{limit}"
+
+    # キャッシュからデータを取得
+    cached_data = app_cache.get(cache_key)
+    if cached_data:
+        return cached_data
+
+    # データベースから取得
+    query = 'SELECT * FROM novels_descs ORDER BY updated_at DESC LIMIT ? OFFSET ?'
+    novels = db.execute_query(query, (limit, offset), fetch=True)
+
+    # キャッシュに保存
+    app_cache.put(cache_key, novels)
+
+    return novels
+
+
+# 最適化されたエピソードリスト表示
+def show_optimized_episode_list(episodes, ncode):
+    """
+    エピソード一覧を仮想化されたリストで表示する
+
+    Args:
+        episodes (list): エピソードデータのリスト
+        ncode (str): 小説コード
+    """
+    global scrollable_frame, scroll_canvas
+
+    # エピソード番号でソート
+    episodes.sort(key=lambda episode: int(episode[0]))
+
+    # スクロール位置をリセット
+    scroll_canvas.yview_moveto(0)
+
+    # 既存のウィジェットをクリア
+    for widget in scrollable_frame.winfo_children():
+        widget.destroy()
+
+    # 仮想リスト管理用の変数
+    visible_items = {}  # {index: widget}
+    item_heights = 30  # 各項目の推定高さ（ピクセル）
+
+    # プレースホルダーキャンバス（全体の高さを確保するためのもの）
+    total_height = len(episodes) * item_heights
+    placeholder = tk.Frame(scrollable_frame, height=total_height, bg="#F0F0F0")
+    placeholder.pack(fill="x")
+
+    # スクロールイベントハンドラ
+    def update_visible_items(event=None):
+        # 現在表示されている範囲を特定
+        top = int(scroll_canvas.yview()[0] * total_height)
+        bottom = int(scroll_canvas.yview()[1] * total_height)
+
+        # 表示範囲内のアイテムインデックスを計算
+        start_idx = max(0, top // item_heights - 5)  # バッファとして前後5項目も表示
+        end_idx = min(len(episodes), (bottom // item_heights) + 5)
+
+        # 範囲外の項目を削除
+        to_remove = []
+        for idx in visible_items:
+            if idx < start_idx or idx >= end_idx:
+                visible_items[idx].destroy()
+                to_remove.append(idx)
+
+        for idx in to_remove:
+            del visible_items[idx]
+
+        # 新しい項目を表示
+        for i in range(start_idx, end_idx):
+            if i not in visible_items and i < len(episodes):
+                episode = episodes[i]
+                frame = tk.Frame(scrollable_frame, bg="#F0F0F0")
+                frame.place(x=0, y=i * item_heights, width=scroll_canvas.winfo_width(), height=item_heights)
+
+                # エピソードラベル
+                episode_label = tk.Label(frame, text=f"Episode {episode[0]}: {episode[1]}",
+                                         bg="#F0F0F0", anchor="w")
+                episode_label.pack(side="left", padx=5, fill="x", expand=True)
+
+                # クリックイベントをラベルにバインド
+                episode_label.bind("<Button-1>", lambda e, ep=episode: on_episode_click(e, ep, ncode))
+
+                visible_items[i] = frame
+
+    # スクロールイベントにハンドラを追加
+    scroll_canvas.bind("<Configure>", update_visible_items)
+    scroll_canvas.bind_all("<MouseWheel>", update_visible_items)
+
+    # 初期表示
+    scroll_canvas.after(100, update_visible_items)
+
+
+# アプリケーション初期化時にキャッシュを作成
+def init_application():
+    """アプリケーション初期化処理"""
+    global app_cache
+    app_cache = NovelCache(cache_size=1000)  # キャッシュサイズを適切に設定
+
+    # その他の初期化処理
+    # ...
+
+
+# アニメーション/トランジション付きのウィジェット更新
+def animate_widget_update(widget, new_text, duration=500):
+    """
+    ウィジェットのテキスト更新にアニメーションを追加
+
+    Args:
+        widget (tk.Widget): 更新するウィジェット
+        new_text (str): 新しいテキスト
+        duration (int): アニメーション時間（ミリ秒）
+    """
+    # 現在の背景色を保存
+    original_bg = widget.cget("bg")
+
+    # 一度背景色を変更
+    widget.config(bg="#E0E0FF")
+
+    # テキストを更新
+    widget.config(text=new_text)
+
+    # 元の背景色に徐々に戻す
+    def fade_back(remaining):
+        if remaining <= 0:
+            widget.config(bg=original_bg)
+            return
+
+        # RGB値を計算（E0E0FFからoriginal_bgへのグラデーション）
+        r = int(0xE0 - (0xE0 - int(original_bg[1:3], 16)) * (1 - remaining / duration))
+        g = int(0xE0 - (0xE0 - int(original_bg[3:5], 16)) * (1 - remaining / duration))
+        b = int(0xFF - (0xFF - int(original_bg[5:7], 16)) * (1 - remaining / duration))
+
+        color = f"#{r:02x}{g:02x}{b:02x}"
+        widget.config(bg=color)
+
+        widget.after(50, fade_back, remaining - 50)
+
+    widget.after(50, fade_back, duration)
