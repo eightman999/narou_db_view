@@ -4,13 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="bad1a08a-9700-4753-8d26-2a6749864910" name="変更" comment="っっl">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/async_bookshelf.py" beforeDir="false" afterPath="$PROJECT_DIR$/async_bookshelf.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/async_episode_count.py" beforeDir="false" afterPath="$PROJECT_DIR$/async_episode_count.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/async_novel_updates.log" beforeDir="false" afterPath="$PROJECT_DIR$/async_novel_updates.log" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/async_recover_novels.py" beforeDir="false" afterPath="$PROJECT_DIR$/async_recover_novels.py" afterDir="false" />
-    </list>
+    <list default="true" id="bad1a08a-9700-4753-8d26-2a6749864910" name="変更" comment="っっl" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -49,51 +43,51 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Python.98.executor": "Run",
-    "Python.AsyncConnection.executor": "Run",
-    "Python.Del_Duplication.executor": "Run",
-    "Python.Recover_novel.executor": "Run",
-    "Python.async_checker.executor": "Run",
-    "Python.bookshelf.executor": "Run",
-    "Python.checker.executor": "Run",
-    "Python.data_inject.executor": "Run",
-    "Python.delete_two_tag.executor": "Run",
-    "Python.ep_no_fomatter.executor": "Run",
-    "Python.episode_count.executor": "Run",
-    "Python.existence_checker.executor": "Run",
-    "Python.first_LR.executor": "Run",
-    "Python.first_formatter.executor": "Run",
-    "Python.first_last_update.executor": "Run",
-    "Python.main_view.executor": "Run",
-    "Python.main_view_async.executor": "Run",
-    "Python.makeEPUB.executor": "Run",
-    "Python.make_txt.executor": "Run",
-    "Python.ohanashi_salvager.executor": "Run",
-    "Python.remove_duplicates.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "dart.analysis.tool.window.visible": "false",
-    "git-widget-placeholder": "master",
-    "ignore.virus.scanning.warn.message": "true",
-    "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "D:/趣味/data analyzer",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "project.structure.last.edited": "プロジェクト",
-    "project.structure.proportion": "0.15",
-    "project.structure.side.proportion": "0.0",
-    "settings.editor.selected.configurable": "reference.settingsdialog.project.grazie",
-    "show.migrate.to.gradle.popup": "false",
-    "vue.rearranger.settings.migration": "true",
-    "アプリケーション.main_view.executor": "Run"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Python.98.executor&quot;: &quot;Run&quot;,
+    &quot;Python.AsyncConnection.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Del_Duplication.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Recover_novel.executor&quot;: &quot;Run&quot;,
+    &quot;Python.async_checker.executor&quot;: &quot;Run&quot;,
+    &quot;Python.bookshelf.executor&quot;: &quot;Run&quot;,
+    &quot;Python.checker.executor&quot;: &quot;Run&quot;,
+    &quot;Python.data_inject.executor&quot;: &quot;Run&quot;,
+    &quot;Python.delete_two_tag.executor&quot;: &quot;Run&quot;,
+    &quot;Python.ep_no_fomatter.executor&quot;: &quot;Run&quot;,
+    &quot;Python.episode_count.executor&quot;: &quot;Run&quot;,
+    &quot;Python.existence_checker.executor&quot;: &quot;Run&quot;,
+    &quot;Python.first_LR.executor&quot;: &quot;Run&quot;,
+    &quot;Python.first_formatter.executor&quot;: &quot;Run&quot;,
+    &quot;Python.first_last_update.executor&quot;: &quot;Run&quot;,
+    &quot;Python.main_view.executor&quot;: &quot;Run&quot;,
+    &quot;Python.main_view_async.executor&quot;: &quot;Run&quot;,
+    &quot;Python.makeEPUB.executor&quot;: &quot;Run&quot;,
+    &quot;Python.make_txt.executor&quot;: &quot;Run&quot;,
+    &quot;Python.ohanashi_salvager.executor&quot;: &quot;Run&quot;,
+    &quot;Python.remove_duplicates.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;dart.analysis.tool.window.visible&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/趣味/data analyzer&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;プロジェクト&quot;,
+    &quot;project.structure.proportion&quot;: &quot;0.15&quot;,
+    &quot;project.structure.side.proportion&quot;: &quot;0.0&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;reference.settingsdialog.project.grazie&quot;,
+    &quot;show.migrate.to.gradle.popup&quot;: &quot;false&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;,
+    &quot;アプリケーション.main_view.executor&quot;: &quot;Run&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/fonts" />
@@ -104,7 +98,7 @@
       <recent name="$PROJECT_DIR$/database" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.main_view_async">
+  <component name="RunManager" selected="Python.main_view">
     <configuration name="AsyncConnection" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="narou_db_formatter" />
       <option name="ENV_FILES" value="" />
@@ -222,9 +216,9 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.main_view" />
         <item itemvalue="Python.main_view_async" />
         <item itemvalue="Python.AsyncConnection" />
-        <item itemvalue="Python.main_view" />
         <item itemvalue="Python.async_checker" />
         <item itemvalue="Python.make_txt" />
       </list>
@@ -270,7 +264,7 @@
       <workItem from="1740796428880" duration="1550000" />
       <workItem from="1740826495002" duration="23000" />
       <workItem from="1740869501316" duration="11797000" />
-      <workItem from="1743680616272" duration="3406000" />
+      <workItem from="1743680616272" duration="3710000" />
     </task>
     <task id="LOCAL-00001" summary="っっl">
       <option name="closed" value="true" />
