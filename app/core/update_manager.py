@@ -67,7 +67,8 @@ class UpdateManager:
             on_complete: 完了時に呼び出すコールバック関数
         """
         try:
-            n_code, title = novel[0], novel[1]
+            n_code = novel[0]
+            title = novel[1] if len(novel) > 1 else "不明なタイトル"
 
             # 現在のエピソード数と目標エピソード数を取得
             current_ep = novel[5] if len(novel) > 5 and novel[5] is not None else 0
@@ -96,29 +97,7 @@ class UpdateManager:
                     self.db_manager.insert_episode(n_code, ep_no, episode_content, episode_title)
 
             # 総エピソード数を更新
-            self.db_manager.update_total_episodes(ncode)
-
-            # 小説キャッシュをクリア
-            self.novel_manager.clear_cache(ncode)
-
-            if progress_queue:
-                progress_queue.put(f"小説 [{title}] の全エピソード再取得が完了しました")
-
-            logger.info(f"小説 {ncode} の全エピソード再取得が完了しました")
-
-        except Exception as e:
-            logger.error(f"全エピソード再取得エラー: {e}")
-            if progress_queue:
-                progress_queue.put(f"エラー: {e}")
-
-        finally:
-            # 更新情報を再チェック
-            self.check_shinchaku()
-
-            # 完了コールバックの呼び出し
-            if on_complete:
-                on_complete()
-                _total_episodes(n_code)
+            self.db_manager.update_total_episodes(n_code)
 
             # 小説キャッシュをクリア
             self.novel_manager.clear_cache(n_code)
@@ -129,9 +108,17 @@ class UpdateManager:
             logger.info(f"小説 {n_code} ({title}) の更新が完了しました")
 
         except Exception as e:
-        logger.error(f"小説更新エラー: {e}")
-        if progress_queue:
-            progress_queue.put(f"エラー: {e}")
+            logger.error(f"小説更新エラー: {e}")
+            if progress_queue:
+                progress_queue.put(f"エラー: {e}")
+
+        finally:
+            # 更新情報を再チェック
+            self.check_shinchaku()
+
+            # 完了コールバックの呼び出し
+            if on_complete:
+                on_complete()
 
     finally:
     # 更新情報を再チェック

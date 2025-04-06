@@ -109,3 +109,24 @@ class DatabaseManager:
             query (str): 実行するSQLクエリ
             params (tuple|list|dict, optional): クエリパラメータ
             fetch_all (bool): 全ての結果を取得するか、一行だけ取得するか
+
+        Returns:
+            list/tuple: クエリ結果。fetch_all=True なら全行のリスト、False なら1行
+        """
+        conn = self.get_read_connection()
+        cursor = conn.cursor()
+
+        try:
+            if params is None:
+                cursor.execute(query)
+            else:
+                cursor.execute(query, params)
+
+            if fetch_all:
+                return cursor.fetchall()
+            else:
+                return cursor.fetchone()
+
+        except sqlite3.Error as e:
+            logger.error(f"読み取りクエリエラー: {e}, クエリ: {query}")
+            raise
