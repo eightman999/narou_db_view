@@ -212,7 +212,7 @@ def show_command_prompt():
 
             title = novel[1]
             rating = novel[4] if len(novel) > 4 else None
-            total_ep = novel[6] if len(novel) > 6 and novel[6] is not None else 0
+            total_ep = int(novel[6]) if len(novel) > 6 and novel[6] is not None else 0  # 型変換を追加
 
             prompt.add_log(f"小説 [{title}] の全エピソード再取得を開始します...")
 
@@ -237,7 +237,7 @@ def show_command_prompt():
             prompt.add_log(f"エラー: {str(e)}")
         finally:
             update_in_progress = False
-
+            
     def execute_fetch_missing_command(prompt, ncode):
         """欠落しているエピソードを取得する"""
         global update_in_progress
