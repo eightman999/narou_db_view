@@ -60,6 +60,32 @@ class DatabaseManager:
 
         return self._read_connection_pool[thread_id]
 
+    def close(self):
+        """
+        全てのデータベース接続を閉じる
+        アプリケーション終了時に呼び出す
+        """
+        with self._lock:
+            # 通常の接続プールを閉じる
+            for thread_id, conn in list(self._connection_pool.items()):
+                try:
+                    conn.close()
+                    logger.debug(f"スレッド {thread_id} のDB接続を閉じました")
+                except Exception as e:
+                    logger.error(f"DB接続を閉じる際にエラーが発生しました: {e}")
+            self._connection_pool.clear()
+
+            # 読み取り専用接続プールを閉じる
+            for thread_id, conn in list(self._read_connection_pool.items()):
+                try:
+                    conn.close()
+                    logger.debug(f"スレッド {thread_id} の読み取り専用DB接続を閉じました")
+                except Exception as e:
+                    logger.error(f"読み取り専用DB接続を閉じる際にエラーが発生しました: {e}")
+            self._read_connection_pool.clear()
+
+            logger.info("全てのデータベース接続を閉じました")
+
     def execute_query(self, query, params=None, fetch=False, fetch_all=True, commit=True):
         """
         SQLクエリを実行し、必要に応じて結果を返す汎用メソッド

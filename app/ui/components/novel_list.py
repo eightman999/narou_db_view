@@ -139,13 +139,20 @@ class NovelListView(ttk.Frame):
         # マウスホイールイベントをバインド
         self.scroll_canvas.bind_all("<MouseWheel>", throttled_scroll_event)
 
-    def show_novels(self):
-        """小説一覧を表示"""
-        # スクロール位置をリセット
-        self.scroll_canvas.yview_moveto(0)
+    def show_novel_list(self):
+        """小説一覧の表示"""
+        # 既存コンテンツをクリア
+        for widget in self.content_frame.winfo_children():
+            widget.pack_forget()  # packは破棄せずに非表示にする
 
-        # 小説データを取得（バックグラウンドスレッドで）
-        threading.Thread(target=self.load_novels).start()
+        # 小説リストビューがすでに作成されていない場合は作成
+        if self.novel_list_view is None or not self.novel_list_view.winfo_exists():
+            self.novel_list_view = NovelListView(self.content_frame, self.font_name, self.novel_manager,
+                                                 self.show_episode_list)
+
+        # 小説リストビューを表示
+        self.novel_list_view.pack(fill="both", expand=True)
+        self.novel_list_view.show_novels()
 
     def load_novels(self):
         """小説データの読み込み（バックグラウンドスレッド用）"""
