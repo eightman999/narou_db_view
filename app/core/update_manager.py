@@ -70,9 +70,8 @@ class UpdateManager:
             n_code = novel[0]
             title = novel[1] if len(novel) > 1 else "不明なタイトル"
 
-            # 現在のエピソード数と目標エピソード数を取得
-            current_ep = novel[5] if len(novel) > 5 and novel[5] is not None else 0
-            total_ep = novel[6] if len(novel) > 6 and novel[6] is not None else 0
+            current_ep = int(novel[5]) if len(novel) > 5 and novel[5] is not None else 0
+            total_ep = int(novel[6]) if len(novel) > 6 and novel[6] is not None else 0
             rating = novel[4] if len(novel) > 4 else None
 
             if progress_queue:
