@@ -94,21 +94,29 @@ class DatabaseHandler:
         """
         with self._lock:
             # 通常の接続プールを閉じる
-            for thread_id, conn in self._connection_pool.items():
-                conn.close()
-                logger.debug(f"スレッド {thread_id} のDB接続を閉じました")
-            self._connection_pool.clear()
+            for thread_id, conn in list(self._connection_pool.items()):
+                try:
+                    if threading.get_ident() == thread_id:
+                        conn.close()
+                        logger.debug(f"スレッド {thread_id} のDB接続を閉じました")
+                        del self._connection_pool[thread_id]
+                except Exception as e:
+                    logger.error(f"DB接続を閉じる際にエラーが発生しました: {e}")
 
             # 読み取り専用接続プールを閉じる
-            for thread_id, conn in self._read_connection_pool.items():
-                conn.close()
-                logger.debug(f"スレッド {thread_id} の読み取り専用DB接続を閉じました")
-            self._read_connection_pool.clear()
+            for thread_id, conn in list(self._read_connection_pool.items()):
+                try:
+                    if threading.get_ident() == thread_id:
+                        conn.close()
+                        logger.debug(f"スレッド {thread_id} の読み取り専用DB接続を閉じました")
+                        del self._read_connection_pool[thread_id]
+                except Exception as e:
+                    logger.error(f"読み取り専用DB接続を閉じる際にエラーが発生しました: {e}")
 
             # スレッドプールをシャットダウン
             self._executor.shutdown(wait=False)
 
-            logger.info("全てのデータベース接続を閉じました")
+            logger.info("アクセス可能なデータベース接続を閉じました")
 
     def execute_query(self, query, params=None, fetch=False, fetch_all=True, commit=True):
         """
