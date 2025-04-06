@@ -16,12 +16,10 @@ from database.db_handler import DatabaseHandler
 from tools.episode_fetcher import EpisodeFetcher
 
 # ロガーの設定
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename='app_main.log'
-)
-logger = logging.getLogger('AppMain')
+from utils.logger_manager import get_logger
+
+# ロガーの設定
+logger = get_logger('AppMain')
 
 # グローバル変数の定義
 global scrollable_frame, scroll_canvas, root, header_label, progress_label
@@ -68,7 +66,8 @@ def update_progress():
 # 小説リストを表示する関数
 def show_novel_list():
     """小説一覧を表示する（最適化版）"""
-    global scrollable_frame, scroll_canvas, main_shelf, list_frame, current_page, items_per_page
+    global scrollable_frame, scroll_canvas, main_shelf, list_frame
+    global current_page  # グローバル変数として宣言
 
     # 既存のウィジェットをクリア
     for widget in list_frame.winfo_children():
@@ -113,7 +112,7 @@ def show_novel_list():
 
     # 小説リストを描画する関数（ページング対応）
     def load_page(page_num):
-        nonlocal current_page
+        global current_page
 
         # ページ境界チェック
         if page_num < 0 or page_num >= total_pages:

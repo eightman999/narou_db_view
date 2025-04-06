@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 from selenium import webdriver
 import requests
 import os
-import logging
+import threading
 from selenium.webdriver.chrome.service import Service
 from concurrent.futures import ThreadPoolExecutor
 from selenium.webdriver.common.by import By
@@ -15,14 +15,10 @@ import random
 
 from config import DATABASE_PATH, DOWNLOAD_DIR, YML_DIR
 from database.db_handler import DatabaseHandler
+from utils.logger_manager import get_logger
 
 # ロガー設定
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename='checker.log'
-)
-logger = logging.getLogger('Checker')
+logger = get_logger('Checker')
 
 # データベースハンドラの取得
 db = DatabaseHandler()

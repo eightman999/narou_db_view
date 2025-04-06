@@ -1,16 +1,11 @@
 import threading
-import logging
 import queue
 from concurrent.futures import ThreadPoolExecutor
 from database.db_handler import DatabaseHandler
+from utils.logger_manager import get_logger
 
 # ロガーの設定
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename='episode_fetcher.log'
-)
-logger = logging.getLogger('EpisodeFetcher')
+logger = get_logger('EpisodeFetcher')
 
 
 class EpisodeFetcher:

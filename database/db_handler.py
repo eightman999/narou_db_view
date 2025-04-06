@@ -1,16 +1,11 @@
 import sqlite3
 import threading
-import logging
 from datetime import datetime
 from config import DATABASE_PATH
+from utils.logger_manager import get_logger
 
 # ロガーの設定
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename='database_operations.log'
-)
-logger = logging.getLogger('DatabaseHandler')
+logger = get_logger('DatabaseHandler')
 
 
 class DatabaseHandler:
