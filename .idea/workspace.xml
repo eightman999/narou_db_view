@@ -6,36 +6,11 @@
   <component name="ChangeListManager">
     <list default="true" id="bad1a08a-9700-4753-8d26-2a6749864910" name="変更" comment="っっl">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/bookshelf.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/bookshelf.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/core/database_manager.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/core/database_manager.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/core/novel_manager.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/core/novel_manager.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/core/settings_manager.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/core/settings_manager.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/core/update_manager.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/core/update_manager.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/ui/components/episode_list.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/ui/components/episode_list.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/ui/components/novel_list.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/ui/components/novel_list.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/ui/components/settings_panel.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/ui/components/settings_panel.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/ui/components/update_panel.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/ui/components/update_panel.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/database/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/checker.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/core/checker.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/main.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/settings.ini" beforeDir="false" afterPath="$PROJECT_DIR$/app/core/settings.ini" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/database/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/tools/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/config.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/database/db_files/novel_status.db-shm" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/database/db_handler.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/database/db_handler.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/fonts/Kyokasho.ttc" beforeDir="false" afterPath="$PROJECT_DIR$/app/fonts/Kyokasho.ttc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tools/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/tools/data_cleanup/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tools/data_cleanup/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/utils/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tools/data_cleanup/database_operations.log" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tools/data_cleanup/duplicates_remover.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/tools/data_cleanup/duplicates_remover.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tools/data_cleanup/episode_cleanup_script.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/tools/data_cleanup/episode_cleanup_script.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tools/episode_fetcher.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/tools/episode_fetcher.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tools/recovery/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/utils/exporters/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/__init__.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/exporters/__init__.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/exporters/txt_exporter.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/utils/exporters/txt_exporter.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/logger_manager.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/utils/logger_manager.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/web/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/database/db_files/novel_status.db-wal" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -109,7 +84,7 @@
     "git-widget-placeholder": "master",
     "ignore.virus.scanning.warn.message": "true",
     "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "D:/趣味/narou_db_view/database/db_files",
+    "last_opened_file_path": "D:/趣味/narou_db_view/app/database/db_files",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -126,6 +101,7 @@
 }]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\趣味\narou_db_view\app\database\db_files" />
       <recent name="D:\趣味\narou_db_view\database\db_files" />
       <recent name="$PROJECT_DIR$/fonts" />
       <recent name="$PROJECT_DIR$/database" />
@@ -329,7 +305,7 @@
     <SUITE FILE_PATH="coverage/narou_db_formatter$delete_two_tag.coverage" NAME="delete_two_tag のカバレッジ結果" MODIFIED="1733821143452" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_view$first_formatter.coverage" NAME="first_formatter のカバレッジ結果" MODIFIED="1740914352973" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_view$main_view_async.coverage" NAME="main_view_async のカバレッジ結果" MODIFIED="1743684144726" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/narou_db_view$main__1_.coverage" NAME="main (1) のカバレッジ結果" MODIFIED="1743943511070" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/app" />
+    <SUITE FILE_PATH="coverage/narou_db_view$main__1_.coverage" NAME="main (1) のカバレッジ結果" MODIFIED="1743944737540" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/app" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$main_view.coverage" NAME="main_view のカバレッジ結果" MODIFIED="1740473074596" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_view$AsyncConnection.coverage" NAME="AsyncConnection のカバレッジ結果" MODIFIED="1743682582024" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$checker.coverage" NAME="checker のカバレッジ結果" MODIFIED="1740469049707" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />

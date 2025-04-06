@@ -60,6 +60,7 @@ class NovelViewerApp:
 
         # 状態管理
         self.update_in_progress = False
+        self.current_view = None  # 現在表示しているビューを追跡するための変数
 
         # 設定の読み込み
         self.load_settings()
@@ -107,15 +108,6 @@ class NovelViewerApp:
         # 進捗状況ラベル
         self.progress_label = tk.Label(self.side_panel, text="", bg="#E0E0E0", wraplength=180)
         self.progress_label.pack(pady=10, side="bottom")
-
-        # ビューの初期化
-        self.novel_list_view = NovelListView(self.content_frame, self.font_name, self.novel_manager,
-                                             self.show_episode_list)
-        self.episode_list_view = EpisodeListView(self.content_frame, self.font_name, self.font_size, self.bg_color,
-                                                 self.novel_manager)
-        self.settings_panel = SettingsPanel(self.content_frame, self.settings_manager, self.on_settings_changed)
-        self.update_panel = UpdatePanel(self.content_frame, self.update_manager, self.update_novels,
-                                        self.on_update_complete)
 
         # 初期ビューを表示
         self.show_loading_screen()
@@ -238,6 +230,9 @@ class NovelViewerApp:
         for widget in self.content_frame.winfo_children():
             widget.destroy()  # 既存ウィジェットを完全に削除
 
+        # 現在のビューを更新
+        self.current_view = "novel_list"
+
         # 小説リストビューを毎回新しく作成
         self.novel_list_view = NovelListView(self.content_frame, self.font_name, self.novel_manager,
                                              self.show_episode_list)
@@ -250,7 +245,12 @@ class NovelViewerApp:
         for widget in self.content_frame.winfo_children():
             widget.destroy()
 
-        # エピソードリストビューを表示
+        # 現在のビューを更新
+        self.current_view = "episode_list"
+
+        # エピソードリストビューを毎回新しく作成
+        self.episode_list_view = EpisodeListView(self.content_frame, self.font_name, self.font_size, self.bg_color,
+                                                 self.novel_manager)
         self.episode_list_view.pack(fill="both", expand=True)
         self.episode_list_view.show_episodes(ncode)
 
@@ -260,7 +260,12 @@ class NovelViewerApp:
         for widget in self.content_frame.winfo_children():
             widget.destroy()
 
-        # 更新パネルを表示
+        # 現在のビューを更新
+        self.current_view = "updated_novels"
+
+        # 更新パネルを毎回新しく作成
+        self.update_panel = UpdatePanel(self.content_frame, self.update_manager, self.update_novels,
+                                      self.on_update_complete)
         self.update_panel.pack(fill="both", expand=True)
         self.update_panel.show_novels()
 
@@ -270,7 +275,11 @@ class NovelViewerApp:
         for widget in self.content_frame.winfo_children():
             widget.destroy()
 
-        # 設定パネルを表示
+        # 現在のビューを更新
+        self.current_view = "settings"
+
+        # 設定パネルを毎回新しく作成
+        self.settings_panel = SettingsPanel(self.content_frame, self.settings_manager, self.on_settings_changed)
         self.settings_panel.pack(fill="both", expand=True)
         self.settings_panel.show_settings(self.font_name, self.font_size, self.bg_color)
 
@@ -390,19 +399,22 @@ class NovelViewerApp:
         self.header_label.config(text=f"新着情報\n新着{shinchaku_count}件,{shinchaku_ep}話")
 
         # 現在のビューを更新
-        if isinstance(self.content_frame.winfo_children()[0], type(self.novel_list_view)):
+        if self.current_view == "novel_list":
             self.show_novel_list()
-        elif isinstance(self.content_frame.winfo_children()[0], type(self.update_panel)):
+        elif self.current_view == "updated_novels":
             self.show_updated_novels()
+        elif self.current_view == "episode_list":
+            # エピソードリストは更新しない
+            pass
+        elif self.current_view == "settings":
+            # 設定画面は更新しない
+            pass
 
     def on_settings_changed(self, font_name, font_size, bg_color):
         """設定変更時の処理"""
         self.font_name = font_name
         self.font_size = font_size
         self.bg_color = bg_color
-
-        # 設定をエピソードビューに反映
-        self.episode_list_view.update_settings(font_name, font_size, bg_color)
 
         # 必要に応じて他のUIコンポーネントも更新
         ttk.Style().configure("TButton", font=(font_name, 10))
