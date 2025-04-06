@@ -237,7 +237,7 @@ def show_command_prompt():
             prompt.add_log(f"エラー: {str(e)}")
         finally:
             update_in_progress = False
-            
+
     def execute_fetch_missing_command(prompt, ncode):
         """欠落しているエピソードを取得する"""
         global update_in_progress
