@@ -1,8 +1,8 @@
 import threading
 import queue
 from concurrent.futures import ThreadPoolExecutor
-from database.db_handler import DatabaseHandler
-from utils.logger_manager import get_logger
+from app.database.db_handler import DatabaseHandler
+from app.utils.logger_manager import get_logger
 
 # ロガーの設定
 logger = get_logger('EpisodeFetcher')
@@ -36,7 +36,7 @@ class EpisodeFetcher:
         Returns:
             tuple: (episode_content, episode_title)
         """
-        from core.checker import catch_up_episode
+        from app.core.checker import catch_up_episode
 
         try:
             logger.info(f"エピソード取得開始: {ncode} - {episode_no}")

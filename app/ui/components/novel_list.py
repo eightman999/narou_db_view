@@ -1,11 +1,11 @@
 """
 小説一覧を表示するUIコンポーネント
 """
+import threading
 import tkinter as tk
 from tkinter import ttk
-import threading
 import time
-from utils.logger_manager import get_logger
+from app.utils.logger_manager import get_logger
 
 # ロガーの設定
 logger = get_logger('NovelListView')
@@ -139,20 +139,31 @@ class NovelListView(ttk.Frame):
         # マウスホイールイベントをバインド
         self.scroll_canvas.bind_all("<MouseWheel>", throttled_scroll_event)
 
-    def show_novel_list(self):
-        """小説一覧の表示"""
-        # 既存コンテンツをクリア
-        for widget in self.content_frame.winfo_children():
-            widget.pack_forget()  # packは破棄せずに非表示にする
+    def show_novels(self):
+        """小説一覧を表示"""
+        # スクロール位置をリセット
+        self.scroll_canvas.yview_moveto(0)
 
-        # 小説リストビューがすでに作成されていない場合は作成
-        if self.novel_list_view is None or not self.novel_list_view.winfo_exists():
-            self.novel_list_view = NovelListView(self.content_frame, self.font_name, self.novel_manager,
-                                                 self.show_episode_list)
+        # ローディング表示
+        self.show_loading()
 
-        # 小説リストビューを表示
-        self.novel_list_view.pack(fill="both", expand=True)
-        self.novel_list_view.show_novels()
+        # 小説データを取得（バックグラウンドスレッドで）
+        threading.Thread(target=self.load_novels).start()
+
+    def show_loading(self):
+        """ローディング表示"""
+        # 前のリストをクリア
+        for widget in self.list_display_frame.winfo_children():
+            widget.destroy()
+
+        # ローディングメッセージ
+        loading_label = tk.Label(
+            self.list_display_frame,
+            text="小説データを読み込んでいます...",
+            bg="#F0F0F0",
+            font=(self.font_name, 12)
+        )
+        loading_label.pack(pady=20)
 
     def load_novels(self):
         """小説データの読み込み（バックグラウンドスレッド用）"""

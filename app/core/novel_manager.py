@@ -2,7 +2,7 @@
 小説データを管理するモジュール
 """
 import threading
-from utils.logger_manager import get_logger
+from app.utils.logger_manager import get_logger
 
 # ロガーの設定
 logger = get_logger('NovelManager')

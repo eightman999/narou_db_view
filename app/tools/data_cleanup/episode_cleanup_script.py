@@ -1,9 +1,8 @@
 import sqlite3
-import logging
-from core.checker import catch_up_episode
+from app.core.checker import catch_up_episode
 
 # ロガーの設定
-from utils.logger_manager import get_logger
+from app.utils.logger_manager import get_logger
 
 # ロガーの設定
 logger = get_logger('EpisodeCleanup')

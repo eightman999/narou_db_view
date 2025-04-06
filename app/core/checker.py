@@ -6,16 +6,15 @@ from bs4 import BeautifulSoup
 from selenium import webdriver
 import requests
 import os
-import threading
 from selenium.webdriver.chrome.service import Service
 from concurrent.futures import ThreadPoolExecutor
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 import random
 
-from config import DATABASE_PATH, DOWNLOAD_DIR, YML_DIR
-from database.db_handler import DatabaseHandler
-from utils.logger_manager import get_logger
+from config import DOWNLOAD_DIR, YML_DIR
+from app.database.db_handler import DatabaseHandler
+from app.utils.logger_manager import get_logger
 
 # ロガー設定
 logger = get_logger('Checker')

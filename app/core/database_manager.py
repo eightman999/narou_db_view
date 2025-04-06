@@ -3,9 +3,8 @@
 """
 import sqlite3
 import threading
-from datetime import datetime
 from config import DATABASE_PATH
-from utils.logger_manager import get_logger
+from app.utils.logger_manager import get_logger
 
 # ロガーの設定
 logger = get_logger('DatabaseManager')

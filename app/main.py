@@ -9,8 +9,6 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
 import queue
-import time
-import asyncio
 
 # モジュールのインポート
 from app.ui.components.novel_list import NovelListView
@@ -24,7 +22,7 @@ from app.core.database_manager import DatabaseManager
 from app.core.settings_manager import SettingsManager
 from app.core.update_manager import UpdateManager
 
-from utils.logger_manager import get_logger
+from app.utils.logger_manager import get_logger
 
 # ロガーの設定
 logger = get_logger('AppMain')
@@ -238,9 +236,11 @@ class NovelViewerApp:
         """小説一覧の表示"""
         # 既存コンテンツをクリア
         for widget in self.content_frame.winfo_children():
-            widget.destroy()
+            widget.destroy()  # 既存ウィジェットを完全に削除
 
-        # 小説リストビューを表示
+        # 小説リストビューを毎回新しく作成
+        self.novel_list_view = NovelListView(self.content_frame, self.font_name, self.novel_manager,
+                                             self.show_episode_list)
         self.novel_list_view.pack(fill="both", expand=True)
         self.novel_list_view.show_novels()
 

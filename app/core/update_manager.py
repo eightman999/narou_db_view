@@ -2,8 +2,8 @@
 小説の更新処理を管理するモジュール
 """
 import threading
-from utils.logger_manager import get_logger
-from core.checker import catch_up_episode, shinchaku_checker
+from app.utils.logger_manager import get_logger
+from app.core.checker import catch_up_episode
 
 # ロガーの設定
 logger = get_logger('UpdateManager')

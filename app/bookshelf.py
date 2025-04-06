@@ -1,10 +1,4 @@
-import sqlite3
-from datetime import datetime
-import requests
-from bs4 import BeautifulSoup
-import random
-from core.checker import USER_AGENTS
-from database.db_handler import DatabaseHandler
+from app.database.db_handler import DatabaseHandler
 
 # データベースハンドラのインスタンスを取得
 db = DatabaseHandler()

@@ -5,7 +5,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
 import time
-from utils.logger_manager import get_logger
+from app.utils.logger_manager import get_logger
 
 # ロガーの設定
 logger = get_logger('UpdatePanel')
