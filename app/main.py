@@ -17,6 +17,7 @@ from tools.episode_fetcher import EpisodeFetcher
 
 # ロガーの設定
 from utils.logger_manager import get_logger
+from app.ui.components.command_prompt import CommandPrompt
 
 # ロガーの設定
 logger = get_logger('AppMain')
@@ -46,6 +47,241 @@ episode_fetcher = EpisodeFetcher(max_workers=10)
 # 更新状況追跡用の変数
 update_in_progress = False
 update_progress_queue = queue.Queue()
+
+
+def show_command_prompt():
+    """コマンドプロンプト画面を表示する"""
+    global update_in_progress, root, episode_fetcher, db
+
+    def command_handler(command):
+        """コマンドを処理する関数"""
+        cmd_prompt.add_log(f"コマンド実行: {command}")
+
+        if command.lower() == "help":
+            return None  # helpコマンドはCommandPromptクラス内で処理
+
+        elif command.lower() == "clear":
+            return None  # clearコマンドはCommandPromptクラス内で処理
+
+        elif command.lower() == "exit":
+            return None  # exitコマンドはCommandPromptクラス内で処理
+
+        elif command.lower().startswith("update"):
+            # 更新処理中なら実行しない
+            if update_in_progress:
+                return "エラー: すでに更新処理が実行中です。完了までお待ちください。"
+
+            # 全作品更新コマンド
+            if "--all" in command:
+                threading.Thread(
+                    target=execute_update_all_command,
+                    args=(cmd_prompt,)
+                ).start()
+                return "全ての更新可能な小説の取得を開始します..."
+
+            # 個別更新コマンド
+            elif "--single" in command:
+                parts = command.split("--")
+                ncode = None
+
+                # ncodeの取得
+                for part in parts:
+                    if part.strip().startswith("n"):
+                        ncode = part
+                        break
+
+                if not ncode:
+                    return "エラー: 小説コード(ncode)が指定されていません。"
+
+                # 全エピソード再取得
+                if "--re_all" in command:
+                    threading.Thread(
+                        target=execute_refetch_command,
+                        args=(cmd_prompt, ncode)
+                    ).start()
+                    return f"小説コード {ncode} の全エピソードの再取得を開始します..."
+
+                # 欠落エピソード取得
+                elif "--get_lost" in command:
+                    threading.Thread(
+                        target=execute_fetch_missing_command,
+                        args=(cmd_prompt, ncode)
+                    ).start()
+                    return f"小説コード {ncode} の欠落エピソードの取得を開始します..."
+
+                # 通常の更新
+                else:
+                    # 小説情報を取得
+                    novel = db.get_novel_by_ncode(ncode)
+                    if not novel:
+                        return f"エラー: 小説コード {ncode} は見つかりませんでした。"
+
+                    threading.Thread(
+                        target=execute_update_single_command,
+                        args=(cmd_prompt, novel)
+                    ).start()
+                    return f"小説 {novel[1]} の更新を開始します..."
+            else:
+                return "エラー: 無効なコマンド形式です。'help'コマンドでヘルプを表示します。"
+
+        else:
+            return "エラー: 不明なコマンドです。'help'コマンドでヘルプを表示します。"
+
+    def execute_update_all_command(prompt):
+        """全小説更新コマンドの実行"""
+        global update_in_progress, main_shinaku, episode_fetcher
+
+        update_in_progress = True
+        try:
+            shinchaku_novels = main_shinaku if main_shinaku else []
+            total = len(shinchaku_novels)
+
+            if total == 0:
+                prompt.add_log("更新が必要な小説がありません。")
+                update_in_progress = False
+                return
+
+            prompt.add_log(f"合計 {total} 件の小説を更新します。")
+
+            for i, novel in enumerate(shinchaku_novels):
+                ncode, title, current_ep, total_ep, rating = novel
+                progress_msg = f"[{i + 1}/{total}] {title}(ID:{ncode}) の更新を開始します..."
+                prompt.add_log(progress_msg)
+
+                try:
+                    # 小説データの更新
+                    episode_fetcher.update_novel_episodes(ncode, current_ep, total_ep, rating)
+                    prompt.add_log(f"[{i + 1}/{total}] {title} - 更新完了")
+                except Exception as e:
+                    prompt.add_log(f"[{i + 1}/{total}] {title} の更新中にエラーが発生しました: {str(e)}")
+
+            # 完了後にグローバル変数を更新
+            shinchaku_ep, main_shinaku, shinchaku_novel = shinchaku_checker()
+            root.after(0, lambda: header_label.config(
+                text=f"新着情報\n新着{shinchaku_novel}件,{shinchaku_ep}話"))
+
+            prompt.add_log("すべての更新処理が完了しました。")
+
+        except Exception as e:
+            prompt.add_log(f"更新処理中にエラーが発生しました: {str(e)}")
+        finally:
+            update_in_progress = False
+
+    def execute_update_single_command(prompt, novel):
+        """単一小説更新コマンドの実行"""
+        global update_in_progress, shinchaku_ep, main_shinaku, shinchaku_novel
+
+        update_in_progress = True
+        try:
+            n_code, title = novel[0], novel[1]
+            current_ep = novel[5] if len(novel) > 5 and novel[5] is not None else 0
+            total_ep = novel[6] if len(novel) > 6 and novel[6] is not None else 0
+            rating = novel[4] if len(novel) > 4 else None
+
+            prompt.add_log(f"小説 [{title}] (ID:{n_code}) の更新を開始します...")
+
+            # エピソードの更新
+            episode_fetcher.update_novel_episodes(n_code, current_ep, total_ep, rating)
+
+            # データベースの更新状態を反映
+            shinchaku_ep, main_shinaku, shinchaku_novel = shinchaku_checker()
+
+            # UI更新
+            root.after(0, lambda: header_label.config(
+                text=f"新着情報\n新着{shinchaku_novel}件,{shinchaku_ep}話"))
+
+            prompt.add_log(f"小説 [{title}] の更新が完了しました")
+
+        except Exception as e:
+            prompt.add_log(f"更新処理中にエラーが発生しました: {str(e)}")
+        finally:
+            update_in_progress = False
+
+    def execute_refetch_command(prompt, ncode):
+        """小説の全エピソードを再取得する"""
+        global update_in_progress
+
+        update_in_progress = True
+        try:
+            # 小説情報の取得
+            novel = db.get_novel_by_ncode(ncode)
+            if not novel:
+                prompt.add_log(f"エラー: 小説コード {ncode} は見つかりませんでした。")
+                update_in_progress = False
+                return
+
+            title = novel[1]
+            rating = novel[4] if len(novel) > 4 else None
+            total_ep = novel[6] if len(novel) > 6 and novel[6] is not None else 0
+
+            prompt.add_log(f"小説 [{title}] の全エピソード再取得を開始します...")
+
+            # 既存のエピソードを削除
+            db.execute_query("DELETE FROM episodes WHERE ncode = ?", (ncode,))
+            prompt.add_log(f"既存のエピソードをデータベースから削除しました")
+
+            if total_ep <= 0:
+                prompt.add_log(f"警告: 小説 {title} の総エピソード数が不明です。更新をスキップします。")
+                update_in_progress = False
+                return
+
+            # エピソードの再取得
+            episode_fetcher.update_novel_episodes(ncode, 0, total_ep, rating)
+
+            # データベースの更新
+            db.update_total_episodes(ncode)
+
+            prompt.add_log(f"小説 [{title}] の全エピソード({total_ep}話)の再取得が完了しました")
+
+        except Exception as e:
+            prompt.add_log(f"エラー: {str(e)}")
+        finally:
+            update_in_progress = False
+
+    def execute_fetch_missing_command(prompt, ncode):
+        """欠落しているエピソードを取得する"""
+        global update_in_progress
+
+        update_in_progress = True
+        try:
+            # 小説情報の取得
+            novel = db.get_novel_by_ncode(ncode)
+            if not novel:
+                prompt.add_log(f"エラー: 小説コード {ncode} は見つかりませんでした。")
+                update_in_progress = False
+                return
+
+            title = novel[1]
+            rating = novel[4] if len(novel) > 4 else None
+
+            prompt.add_log(f"小説 [{title}] の欠落エピソード取得を開始します...")
+
+            # 欠落エピソードの検索
+            missing_episodes = db.find_missing_episodes(ncode)
+
+            if not missing_episodes:
+                prompt.add_log(f"小説 [{title}] に欠落エピソードはありません。")
+                update_in_progress = False
+                return
+
+            prompt.add_log(f"{len(missing_episodes)}件の欠落エピソードが見つかりました。")
+
+            # 欠落エピソードの取得
+            episode_fetcher.update_missing_episodes(ncode, rating)
+
+            # データベースの更新
+            db.update_total_episodes(ncode)
+
+            prompt.add_log(f"小説 [{title}] の欠落エピソード取得が完了しました")
+
+        except Exception as e:
+            prompt.add_log(f"エラー: {str(e)}")
+        finally:
+            update_in_progress = False
+
+    # コマンドプロンプトウィンドウの作成
+    cmd_prompt = CommandPrompt(root, command_handler)
+    return cmd_prompt
 
 
 # 進捗状況を更新する関数
@@ -184,6 +420,7 @@ def configure_scroll_event():
 
     # マウスホイールイベントをバインド
     scroll_canvas.bind_all("<MouseWheel>", throttled_scroll_event)
+
 
 def on_title_click(event, n_code):
     """小説タイトルがクリックされたときの処理"""
@@ -346,92 +583,6 @@ def show_settings():
         messagebox.showinfo("設定", "設定が適用されました")
         apply_button = ttk.Button(setting_frame, text="適用", command=apply_settings)
         apply_button.grid(row=3, column=0, columnspan=2, pady=10)
-
-
-def show_input_screen():
-    """入力画面を表示する"""
-    global root, main_shinchaku
-
-    input_window = tk.Toplevel()
-    input_window.title("入力画面")
-    input_window.geometry("500x300")
-
-    input_label = tk.Label(input_window, text="")
-    input_label.pack(pady=10)
-
-    input_text = tk.Text(input_window, height=10, width=50)
-    input_text.pack(pady=5)
-
-    def send_input(event=None):
-        """入力テキストを処理する"""
-        user_input = input_text.get("1.0", tk.END).strip()
-        logger.info(f"User input: {user_input}")
-
-        if user_input == "exit":
-            root.quit()
-
-        elif "update" in user_input:
-            parts = user_input.split("update")
-
-            if "--all" in parts[1]:
-                # 全ての対象小説を更新
-                threading.Thread(target=update_all_novels_threaded, args=(main_shinchaku,)).start()
-
-            elif "--single" in parts[1]:
-                remaining = parts[1].split("--single")[1]
-
-                if "--re_all" in remaining:
-                    # 指定された小説の全エピソードを再取得
-                    if "--n" in remaining:
-                        ncode_part = remaining.split("--n")[1].strip()
-                        # 空白やその他の文字を除去
-                        ncode = ncode_part.split()[0] if ' ' in ncode_part else ncode_part
-
-                        threading.Thread(target=refetch_all_episodes, args=(ncode,)).start()
-                        input_label.config(text=f"小説 {ncode} の全エピソードを再取得中...")
-
-                    else:
-                        input_label.config(text="エラー: ncodeを指定してください (--n)")
-
-                elif "--get_lost" in remaining:
-                    # 欠落しているエピソードを取得
-                    if "--n" in remaining:
-                        ncode_part = remaining.split("--n")[1].strip()
-                        ncode = ncode_part.split()[0] if ' ' in ncode_part else ncode_part
-
-                        threading.Thread(target=fetch_missing_episodes, args=(ncode,)).start()
-                        input_label.config(text=f"小説 {ncode} の欠落エピソードを取得中...")
-
-                    else:
-                        input_label.config(text="エラー: ncodeを指定してください (--n)")
-                else:
-                    input_label.config(text="無効なコマンド")
-            else:
-                input_label.config(text="無効なコマンド")
-
-        elif "n" in user_input:
-            try:
-                index = int(user_input.replace("n", ""))
-                if 0 <= index < len(main_shelf):
-                    ncode = main_shelf[index][0]
-                    title = main_shelf[index][1]
-                    input_label.config(text=f"ncode: {ncode}, title: {title}")
-                else:
-                    input_label.config(text="インデックスが範囲外です")
-            except ValueError:
-                input_label.config(text="無効な入力です")
-        else:
-            input_label.config(text=f"入力: {user_input}")
-
-        input_text.delete("1.0", tk.END)
-
-    def exit_input():
-        """入力画面を閉じる"""
-        input_window.destroy()
-
-    exit_button = tk.Button(input_window, text="終了", command=exit_input)
-    exit_button.pack(pady=10)
-    input_text.bind("<Return>", send_input)
 
 
 def show_updated_novels():
@@ -798,7 +949,7 @@ def main(main_shelf=None, last_read_novel=None, last_read_epno=0,
     input_button = tk.Button(
         side_panel,
         text="コマンド入力",
-        command=lambda: root.after(50, show_input_screen),
+        command=lambda: root.after(50, show_command_prompt()),
         **button_style
     )
     input_button.pack(pady=5)
