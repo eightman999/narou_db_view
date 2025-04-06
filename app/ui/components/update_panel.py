@@ -5,6 +5,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
 import time
+
+from app.core.checker import catch_up_episode
 from app.utils.logger_manager import get_logger
 
 # ロガーの設定
@@ -81,6 +83,7 @@ class UpdatePanel(ttk.Frame):
         # リスト表示フレーム
         self.list_display_frame = tk.Frame(self.scrollable_frame, bg="#F0F0F0")
         self.list_display_frame.pack(fill="x", expand=True, padx=10)
+
 
     def configure_scroll_event(self):
         """スクロールイベントの設定"""
@@ -193,12 +196,19 @@ class UpdatePanel(ttk.Frame):
             status_label.pack(side="left", padx=5)
 
             # タイトルラベル
+            # タイトルラベル（クリック可能）
             title_label = tk.Label(
                 item_frame,
                 text=title,
                 bg="#F0F0F0",
-                anchor="w"
+                anchor="w",
+                cursor="hand2"  # クリック可能なことを示すカーソル
             )
+            title_label.pack(side="left", padx=5, fill="x", expand=True)
+
+            # タイトルのクリックイベント
+            title_label.bind("<Button-1>", lambda e, ncode=n_code, t=title, c=current_ep, to=total_ep, r=rating:
+            self.update_novel(ncode, t, c, to, r))
             title_label.pack(side="left", padx=5, fill="x", expand=True)
 
             # 更新ボタン
@@ -236,21 +246,97 @@ class UpdatePanel(ttk.Frame):
         if self.update_callback:
             self.update_callback(self.shinchaku_novels)
 
-    def update_novel(self, n_code, title, current_ep, total_ep, rating):
+    def update_novel(self, novel, progress_queue=None, on_complete=None):
         """
         単一の小説を更新
 
         Args:
-            n_code: 小説コード
-            title: タイトル
-            current_ep: 現在のエピソード数
-            total_ep: 総エピソード数
-            rating: レーティング
+            novel: 小説データ (n_code, title, ...)
+            progress_queue: 進捗状況を通知するキュー
+            on_complete: 完了時に呼び出すコールバック関数
         """
-        # 更新を実行（コールバック経由）
-        if self.update_callback:
-            self.update_callback([(n_code, title, current_ep, total_ep, rating)])
+        try:
+            n_code = novel[0]
+            title = novel[1] if len(novel) > 1 else "不明なタイトル"
 
+            current_ep = int(novel[5]) if len(novel) > 5 and novel[5] is not None else 0
+            total_ep = int(novel[6]) if len(novel) > 6 and novel[6] is not None else 0
+            rating = novel[4] if len(novel) > 4 else None
+
+            if progress_queue:
+                progress_queue.put(f"小説 [{title}] (ID:{n_code}) の更新を開始します...")
+
+            # 更新が必要なエピソードを取得
+            if total_ep <= current_ep:
+                if progress_queue:
+                    progress_queue.put(f"小説 [{title}] は既に最新です")
+
+                # 完了コールバックの呼び出し
+                if on_complete:
+                    on_complete()
+                return
+
+            # 小説データ取得のためのワーカースレッド
+            def update_worker():
+                try:
+                    # 不足しているエピソードを取得
+                    for ep_no in range(current_ep + 1, total_ep + 1):
+                        if progress_queue:
+                            progress_queue.put(f"エピソード {ep_no}/{total_ep} を取得中...")
+
+                        # エピソードを取得
+                        episode_content, episode_title = catch_up_episode(n_code, ep_no, rating)
+
+                        # データベースに保存
+                        if episode_content and episode_title:
+                            self.db_manager.insert_episode(n_code, ep_no, episode_content, episode_title)
+
+                    # 総エピソード数を更新
+                    self.db_manager.update_total_episodes(n_code)
+
+                    # 小説キャッシュをクリア
+                    self.novel_manager.clear_cache(n_code)
+
+                    if progress_queue:
+                        progress_queue.put(f"小説 [{title}] の更新が完了しました")
+
+                    logger.info(f"小説 {n_code} ({title}) の更新が完了しました")
+
+                except Exception as e:
+                    logger.error(f"小説更新エラー: {e}")
+                    if progress_queue:
+                        progress_queue.put(f"エラー: {e}")
+
+                finally:
+                    # 更新情報を再チェック
+                    self.check_shinchaku()
+
+                    # 完了コールバックの呼び出しをメインスレッドで実行
+                    if on_complete:
+                        # tkinterのイベントキューを使用
+                        try:
+                            import tkinter as tk
+                            if tk._default_root:
+                                tk._default_root.after(0, on_complete)
+                            else:
+                                on_complete()
+                        except:
+                            # tkinterが使用できない場合は直接呼び出し
+                            on_complete()
+
+            # 非同期で更新を実行
+            update_thread = threading.Thread(target=update_worker)
+            update_thread.daemon = True
+            update_thread.start()
+
+        except Exception as e:
+            logger.error(f"小説更新スレッド起動エラー: {e}")
+            if progress_queue:
+                progress_queue.put(f"エラー: {e}")
+
+            # エラー時もコールバックを呼び出す
+            if on_complete:
+                on_complete()
     def check_missing_episodes(self, ncode):
         """
         欠落エピソードを確認
