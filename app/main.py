@@ -65,6 +65,53 @@ class NovelViewerApp:
         # 設定の読み込み
         self.load_settings()
 
+    def setup_progress_panel(self):
+        """進捗表示パネルの設定"""
+        # 進捗表示用のフレーム（サイドパネルの下部に配置）
+        self.progress_panel = tk.Frame(self.side_panel, bg="#E0E0E0")
+        self.progress_panel.pack(side="bottom", fill="x", padx=5, pady=10)
+
+        # 進捗タイトル
+        self.progress_title = tk.Label(
+            self.progress_panel,
+            text="更新状況",
+            font=(self.font_name, 10, "bold"),
+            bg="#E0E0E0"
+        )
+        self.progress_title.pack(fill="x", pady=(0, 5))
+
+        # 進捗メッセージ
+        self.progress_message = tk.Label(
+            self.progress_panel,
+            text="",
+            wraplength=180,
+            justify="left",
+            font=(self.font_name, 9),
+            bg="#E0E0E0"
+        )
+        self.progress_message.pack(fill="x", pady=(0, 5))
+
+        # 進捗バー
+        self.progress_bar = ttk.Progressbar(
+            self.progress_panel,
+            orient="horizontal",
+            mode="determinate",
+            length=100
+        )
+        self.progress_bar.pack(fill="x", pady=(0, 5))
+
+        # 進捗パーセント
+        self.progress_percent = tk.Label(
+            self.progress_panel,
+            text="",
+            font=(self.font_name, 9),
+            bg="#E0E0E0"
+        )
+        self.progress_percent.pack(fill="x")
+
+        # 初期状態では非表示
+        self.progress_panel.pack_forget()
+
     def load_settings(self):
         """設定を読み込む"""
         self.font_name, self.font_size, self.bg_color = self.settings_manager.load_settings()
@@ -111,7 +158,7 @@ class NovelViewerApp:
 
         # 初期ビューを表示
         self.show_loading_screen()
-
+        self.setup_progress_panel()
         # 非同期データロードの開始
         self.start_background_tasks()
 
@@ -214,16 +261,65 @@ class NovelViewerApp:
     def update_progress(self):
         """進捗状況の表示を更新する"""
         if not self.update_progress_queue.empty():
-            message = self.update_progress_queue.get()
-            self.progress_label.config(text=message)
+            progress_data = self.update_progress_queue.get()
+
+            # データが辞書形式の場合、詳細な進捗情報として扱う
+            if isinstance(progress_data, dict):
+                # 進捗パネルの表示/非表示
+                if 'show' in progress_data:
+                    if progress_data['show']:
+                        self.progress_panel.pack(side="bottom", fill="x", padx=5, pady=10)
+                    else:
+                        self.progress_panel.pack_forget()
+
+                # 進捗率の更新
+                if 'percent' in progress_data:
+                    percent = progress_data['percent']
+                    self.progress_bar['value'] = percent
+                    self.progress_percent.config(text=f"{percent}%")
+
+                # メッセージの更新
+                if 'message' in progress_data:
+                    self.progress_message.config(text=progress_data['message'])
+            else:
+                # 文字列の場合は単純なメッセージとして表示
+                self.progress_message.config(text=progress_data)
+                self.progress_panel.pack(side="bottom", fill="x", padx=5, pady=10)
 
         # 更新中は定期的に再実行
         if self.update_in_progress:
             self.root.after(100, self.update_progress)
         else:
             # 3秒後にメッセージをクリア
-            self.root.after(3000, lambda: self.progress_label.config(text=""))
+            self.root.after(3000, lambda: self.progress_panel.pack_forget())
 
+    # update_novels メソッドを更新
+    def update_novels(self, novels=None):
+        """小説を更新する"""
+        if self.update_in_progress:
+            messagebox.showinfo("更新中", "既に更新処理が実行中です。完了までお待ちください。")
+            return
+
+        self.update_in_progress = True
+        self.update_progress_queue.put({
+            'show': True,
+            'percent': 0,
+            'message': "更新処理を開始しています..."
+        })
+        self.root.after(100, self.update_progress)
+
+        if novels:
+            # 特定の小説を更新
+            threading.Thread(
+                target=self.update_manager.update_novels,
+                args=(novels, self.update_progress_queue, self.on_update_complete)
+            ).start()
+        else:
+            # 全ての新着小説を更新
+            threading.Thread(
+                target=self.update_manager.update_all_novels,
+                args=(self.update_progress_queue, self.on_update_complete)
+            ).start()
     def show_novel_list(self):
         """小説一覧の表示"""
         # 既存コンテンツをクリア
@@ -364,28 +460,6 @@ class NovelViewerApp:
         else:
             return "エラー: 無効なコマンド形式です。'help'コマンドでヘルプを表示します。"
 
-    def update_novels(self, novels=None):
-        """小説を更新する"""
-        if self.update_in_progress:
-            messagebox.showinfo("更新中", "既に更新処理が実行中です。完了までお待ちください。")
-            return
-
-        self.update_in_progress = True
-        self.update_progress_queue.put("更新処理を開始しています...")
-        self.root.after(100, self.update_progress)
-
-        if novels:
-            # 特定の小説を更新
-            threading.Thread(
-                target=self.update_manager.update_novels,
-                args=(novels, self.update_progress_queue, self.on_update_complete)
-            ).start()
-        else:
-            # 全ての新着小説を更新
-            threading.Thread(
-                target=self.update_manager.update_all_novels,
-                args=(self.update_progress_queue, self.on_update_complete)
-            ).start()
 
     def on_update_complete(self):
         """更新完了時の処理"""
