@@ -8,5 +8,12 @@
       <jdbc-url>jdbc:sqlite:D:\趣味\narou_db_view\database\novel_status.db</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
+    <data-source source="LOCAL" name="novel_status [2]" uuid="d0bb0123-cad4-4343-923d-b6d39fe9bfcc">
+      <driver-ref>sqlite.xerial</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
+      <jdbc-url>jdbc:sqlite:D:\趣味\narou_db_view\app\database\db_files\novel_status.db</jdbc-url>
+      <working-dir>$ProjectFileDir$</working-dir>
+    </data-source>
   </component>
 </project>

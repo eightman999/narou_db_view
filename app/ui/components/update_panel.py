@@ -207,8 +207,10 @@ class UpdatePanel(ttk.Frame):
             title_label.pack(side="left", padx=5, fill="x", expand=True)
 
             # タイトルのクリックイベント
-            title_label.bind("<Button-1>", lambda e, ncode=n_code, t=title, c=current_ep, to=total_ep, r=rating:
-            self.update_novel(ncode, t, c, to, r))
+            title_label.bind(
+                "<Button-1>",
+                lambda e, novel_data=(n_code, title, current_ep, total_ep, rating): self.update_novel(novel_data)
+            )
             title_label.pack(side="left", padx=5, fill="x", expand=True)
 
             # 更新ボタン
