@@ -127,3 +127,15 @@ class DatabaseManager:
         SQLクエリを実行し、必要に応じて結果を返す汎用メソッド
         """
         return self.db_handler.execute_query(query, params, fetch, fetch_all, commit)
+
+    def close(self):
+        """
+        全てのデータベース接続を閉じてWALファイルをクリーンアップする
+        アプリケーション終了時に呼び出す
+        """
+        try:
+            # DatabaseHandlerの完全シャットダウンメソッドを呼び出す
+            self.db_handler.shutdown()
+            logger.info("全てのデータベース接続を閉じ、WALファイルをクリーンアップしました")
+        except Exception as e:
+            logger.error(f"データベース接続の終了処理中にエラーが発生しました: {e}")

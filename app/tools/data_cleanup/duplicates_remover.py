@@ -3,6 +3,7 @@ import time
 import random
 from app.core.checker import catch_up_episode
 from app.utils.logger_manager import get_logger
+from config import DATABASE_PATH  # 正しいデータベースパスをインポート
 
 # ロガーの設定
 logger = get_logger('DuplicatesHandler')
@@ -16,23 +17,25 @@ class DuplicatesHandler:
     - 欠落エピソードの特定と補完
     """
 
-    def __init__(self, db_path='database/novel_status.db', max_retries=3, retry_delay=5):
+    def __init__(self, db_path=None, max_retries=3, retry_delay=5):
         """
         初期化
 
         Args:
-            db_path (str): データベースファイルのパス
+            db_path (str, optional): データベースファイルのパス。Noneの場合はconfigからパスを使用
             max_retries (int): エピソード取得の最大再試行回数
             retry_delay (int): 再試行間の待機時間（秒）
         """
-        self.db_path = db_path
+        self.db_path = db_path if db_path is not None else DATABASE_PATH
         self.max_retries = max_retries
         self.retry_delay = retry_delay
+        logger.info(f"DuplicatesHandlerを初期化しました。使用するDB: {self.db_path}")
 
     def remove_novel_duplicates(self):
         """
         重複する小説エントリを統合し、最適な情報を保持する
         """
+        conn = None
         try:
             # データベースに接続
             conn = sqlite3.connect(self.db_path)
@@ -95,6 +98,7 @@ class DuplicatesHandler:
         Returns:
             dict: 問題のあるエピソードのリスト {n_code: [(episode_no, issue_type), ...]}
         """
+        conn = None
         try:
             # データベースに接続
             conn = sqlite3.connect(self.db_path)
@@ -167,10 +171,11 @@ class DuplicatesHandler:
         repaired_count = 0
 
         # データベースに接続
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
+        conn = None
         try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
             for n_code, (bad_episodes, rating) in problematic_dict.items():
                 logger.info(f"小説 {n_code} の問題エピソード {len(bad_episodes)}件を修復します")
 
@@ -210,11 +215,13 @@ class DuplicatesHandler:
 
         except sqlite3.Error as e:
             logger.error(f"エピソード修復中にデータベースエラーが発生しました: {e}")
-            conn.rollback()
+            if conn:
+                conn.rollback()
             return 0
 
         finally:
-            conn.close()
+            if conn:
+                conn.close()
 
     def remove_episode_duplicates(self):
         """
@@ -223,6 +230,7 @@ class DuplicatesHandler:
         Returns:
             int: 削除した重複エピソードの数
         """
+        conn = None
         try:
             # データベースに接続
             conn = sqlite3.connect(self.db_path)
@@ -301,6 +309,7 @@ class DuplicatesHandler:
             tuple: (削除した小説の数, 削除したエピソードの数, 修復したエピソードの数)
         """
         logger.info("完全なデータクリーンアップを開始します")
+        logger.info(f"使用するデータベース: {self.db_path}")
 
         # 1. 小説テーブルの重複削除
         novel_deletions = self.remove_novel_duplicates()
@@ -320,7 +329,17 @@ class DuplicatesHandler:
 
 # 単独実行時のエントリポイント
 if __name__ == "__main__":
-    handler = DuplicatesHandler()
-    results = handler.run_full_cleanup()
-    print(
-        f"クリーンアップ結果: 小説重複削除: {results[0]}件, エピソード重複削除: {results[1]}件, エピソード修復: {results[2]}件")
+    # DATABASE_PATHをログに出力
+    logger.info(f"使用するデータベースパス: {DATABASE_PATH}")
+
+    # ファイルが存在するか確認
+    import os
+
+    if not os.path.exists(DATABASE_PATH):
+        logger.error(f"データベースファイルが見つかりません: {DATABASE_PATH}")
+        print(f"エラー: データベースファイル '{DATABASE_PATH}' が見つかりません。")
+    else:
+        handler = DuplicatesHandler()
+        results = handler.run_full_cleanup()
+        print(
+            f"クリーンアップ結果: 小説重複削除: {results[0]}件, エピソード重複削除: {results[1]}件, エピソード修復: {results[2]}件")

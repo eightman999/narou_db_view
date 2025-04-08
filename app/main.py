@@ -502,6 +502,8 @@ class NovelViewerApp:
         self.root.mainloop()
 
         # アプリケーション終了時の処理
+        logger.info("アプリケーションの終了処理を開始します")
+        # データベース接続を閉じてWALファイルをクリーンアップ
         self.db_manager.close()
         logger.info("アプリケーションを終了しました")
 

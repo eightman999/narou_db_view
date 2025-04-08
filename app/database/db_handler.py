@@ -1,3 +1,4 @@
+import os
 import sqlite3
 import threading
 from datetime import datetime
@@ -45,6 +46,137 @@ class DatabaseHandler:
         self._bulk_processing_thread.start()
 
         logger.info("DatabaseHandlerが初期化されました（並列処理対応版）")
+
+    def get_connection(self):
+        """
+        現在のスレッド用のデータベース接続を取得
+        各スレッドごとに別々の接続を持つことでスレッドセーフに
+        """
+        thread_id = threading.get_ident()
+
+        if thread_id not in self._connection_pool:
+            conn = sqlite3.connect(self.db_path)
+            # WALモードを使用することでパフォーマンスとスレッドセーフ性を両立
+            conn.execute('PRAGMA journal_mode=WAL')
+            # キャッシュサイズを増加させてパフォーマンスを向上
+            conn.execute('PRAGMA cache_size=-20000')  # 約20MBのキャッシュ
+            # 同期モードを調整して書き込み速度を向上
+            conn.execute('PRAGMA synchronous=NORMAL')
+            # テキストをUTF-8としてエンコード
+            conn.text_factory = str
+            self._connection_pool[thread_id] = conn
+            self._connection_locks[thread_id] = threading.Lock()
+            logger.debug(f"スレッド {thread_id} に新しいDB接続を作成")
+
+        return self._connection_pool[thread_id]
+
+    def get_read_connection(self):
+        """読み取り専用の接続を取得（並列処理のために最適化）"""
+        thread_id = threading.get_ident()
+
+        if thread_id not in self._read_connection_pool:
+            conn = sqlite3.connect(self.db_path)
+            # WALモードを使用
+            conn.execute('PRAGMA journal_mode=WAL')
+            # 読み取り専用モードでパフォーマンス向上
+            conn.execute('PRAGMA query_only=ON')
+            # キャッシュサイズを増加
+            conn.execute('PRAGMA cache_size=-20000')
+            conn.text_factory = str
+            self._read_connection_pool[thread_id] = conn
+            logger.debug(f"スレッド {thread_id} に読み取り専用DB接続を作成")
+
+        return self._read_connection_pool[thread_id]
+
+    def cleanup_wal_files(self):
+        """
+        WALファイルを明示的にクリーンアップ
+        アプリケーション終了時に呼び出す
+        """
+        logger.info("WALファイルのクリーンアップを開始します")
+        try:
+            # 既存の接続をすべて閉じる前に新しい接続を作成
+            conn = sqlite3.connect(self.db_path)
+
+            # 完全なチェックポイントを実行（WALファイルの内容をメインDBに統合）
+            conn.execute("PRAGMA wal_checkpoint(FULL)")
+            logger.debug("WALチェックポイントを実行しました")
+
+            # 通常のジャーナルモードに戻す
+            conn.execute("PRAGMA journal_mode=DELETE")
+            conn.commit()
+            logger.debug("ジャーナルモードをDELETEに変更しました")
+
+            # 接続を閉じる
+            conn.close()
+
+            # .db-walと.db-shmファイルが存在する場合は削除
+            wal_file = self.db_path + "-wal"
+            shm_file = self.db_path + "-shm"
+
+            if os.path.exists(wal_file):
+                try:
+                    os.remove(wal_file)
+                    logger.info(f"WALファイル {wal_file} を削除しました")
+                except OSError as e:
+                    logger.warning(f"WALファイル {wal_file} の削除に失敗: {e}")
+
+            if os.path.exists(shm_file):
+                try:
+                    os.remove(shm_file)
+                    logger.info(f"SHMファイル {shm_file} を削除しました")
+                except OSError as e:
+                    logger.warning(f"SHMファイル {shm_file} の削除に失敗: {e}")
+
+            logger.info("WALファイルのクリーンアップが完了しました")
+        except Exception as e:
+            logger.error(f"WALファイルのクリーンアップ中にエラーが発生しました: {e}")
+
+    def close_all_connections(self):
+        """
+        全てのデータベース接続を閉じる
+        アプリケーション終了時などに呼び出す
+        """
+        with self._lock:
+            # 通常の接続プールを閉じる
+            for thread_id, conn in list(self._connection_pool.items()):
+                try:
+                    if threading.get_ident() == thread_id:
+                        conn.close()
+                        logger.debug(f"スレッド {thread_id} のDB接続を閉じました")
+                        del self._connection_pool[thread_id]
+                except Exception as e:
+                    logger.error(f"DB接続を閉じる際にエラーが発生しました: {e}")
+
+            # 読み取り専用接続プールを閉じる
+            for thread_id, conn in list(self._read_connection_pool.items()):
+                try:
+                    if threading.get_ident() == thread_id:
+                        conn.close()
+                        logger.debug(f"スレッド {thread_id} の読み取り専用DB接続を閉じました")
+                        del self._read_connection_pool[thread_id]
+                except Exception as e:
+                    logger.error(f"読み取り専用DB接続を閉じる際にエラーが発生しました: {e}")
+
+            # スレッドプールをシャットダウン
+            self._executor.shutdown(wait=False)
+
+            logger.info("アクセス可能なデータベース接続を閉じました")
+
+    def shutdown(self):
+        """
+        データベースのシャットダウン処理
+        アプリケーション終了時に呼び出す
+        """
+        logger.info("データベースのシャットダウンを開始します")
+
+        # すべての接続を閉じる
+        self.close_all_connections()
+
+        # WALファイルをクリーンアップ
+        self.cleanup_wal_files()
+
+        logger.info("データベースのシャットダウンが完了しました")
 
     def get_connection(self):
         """
