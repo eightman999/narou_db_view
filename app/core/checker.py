@@ -255,6 +255,7 @@ def db_update():
 def yml_parse_time(n_codes_ratings):
     """
     YAMLファイルを解析してデータベースを更新
+    更新時刻はlast_update_dateに保存し、話数の更新があった場合のみupdate_atを更新
 
     Args:
         n_codes_ratings (list): 小説コードとレーティングのリスト
@@ -316,19 +317,54 @@ def yml_parse_time(n_codes_ratings):
             updated_at = updated_at.strftime('%Y-%m-%d %H:%M:%S')
 
         try:
+            # 現在のエピソード数を取得
+            current_data = db.execute_query(
+                "SELECT total_ep FROM novels_descs WHERE n_code = ?",
+                (n_code,),
+                fetch=True,
+                fetch_all=False
+            )
+
+            current_total_ep = 0
+            if current_data and current_data[0] is not None:
+                current_total_ep = current_data[0]
+
+            # 現在時刻を取得（実際の更新があった場合に使用）
+            current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+            # 話数に更新があるかどうかを確認
+            has_new_episodes = int(general_all_no) > current_total_ep
+
+            # 更新するフィールドを準備
+            update_fields = {
+                'general_all_no': int(general_all_no),
+                'Synopsis': story,
+                'title': title,
+                'last_update_date': updated_at,  # YMLからの更新日時はlast_update_dateに保存
+                'author': writer
+            }
+
+            # 話数の更新があった場合のみupdate_atを更新
+            if has_new_episodes:
+                update_fields['updated_at'] = current_time
+                logger.info(f"New episodes detected for {n_code}: {current_total_ep} -> {general_all_no}")
+
+                # episodes テーブルの新しいエピソードのupdate_timeを設定するためのクエリを準備
+                # この更新はエピソード取得時に適用される（catch_up_episodeなどで）
+
+            # 動的にSQLクエリを構築
+            field_names = ', '.join([f"{field} = ?" for field in update_fields.keys()])
+            values = list(update_fields.values())
+            values.append(n_code)  # WHERE句用
+
             # データベースを更新
             db.execute_query(
-                """
-                UPDATE novels_descs
-                SET general_all_no = ?, Synopsis = ?, title = ?, updated_at = ?, author = ?
-                WHERE n_code = ?
-                """,
-                (int(general_all_no), story, title, updated_at, writer, n_code)
+                f"UPDATE novels_descs SET {field_names} WHERE n_code = ?",
+                tuple(values)
             )
             logger.info(f"Successfully updated {n_code}")
         except Exception as e:
             logger.error(f"Database update failed for {n_code}: {e}")
-
 
 def ncode_title(n_code):
     """

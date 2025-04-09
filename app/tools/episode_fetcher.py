@@ -1,3 +1,4 @@
+import datetime
 import threading
 import queue
 from concurrent.futures import ThreadPoolExecutor
@@ -43,11 +44,45 @@ class EpisodeFetcher:
             episode_content, episode_title = catch_up_episode(ncode, episode_no, rating)
             logger.info(f"エピソード取得完了: {ncode} - {episode_no} - タイトル: {episode_title}")
 
+            # 現在時刻を取得して更新情報に含める
+            current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
             # 取得結果をキューに入れる
-            self.result_queue.put((ncode, episode_no, episode_content, episode_title))
+            self.result_queue.put((ncode, episode_no, episode_content, episode_title, current_time))
 
         except Exception as e:
             logger.error(f"エピソード取得エラー: {ncode} - {episode_no} - {str(e)}")
+
+    # app/tools/episode_fetcher.py の save_episode_worker メソッドを修正
+    def save_episode_worker(self):
+        """
+        取得したエピソードをデータベースに保存するワーカースレッド
+        """
+        while not (self.stop_event.is_set() and self.result_queue.empty()):
+            try:
+                # タイムアウト付きでキューからデータを取得（タイムスタンプ付き）
+                ncode, episode_no, content, title, update_time = self.result_queue.get(timeout=1)
+
+                try:
+                    # データベースに保存（タイムスタンプ付き）
+                    self.db.insert_episode(ncode, episode_no, content, title, update_time)
+
+                    # 小説テーブルのupdate_atも更新
+                    self.db.execute_query(
+                        "UPDATE novels_descs SET updated_at = ? WHERE n_code = ?",
+                        (update_time, ncode)
+                    )
+
+                    logger.info(f"エピソード保存完了: {ncode} - {episode_no}")
+                except Exception as e:
+                    logger.error(f"エピソード保存エラー: {ncode} - {episode_no} - {str(e)}")
+
+                self.result_queue.task_done()
+
+            except queue.Empty:
+                # タイムアウトした場合は次のループへ
+                continue
+
 
     def save_episode_worker(self):
         """

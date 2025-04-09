@@ -1,6 +1,7 @@
 """
 小説の更新処理を管理するモジュールの改良
 """
+import datetime
 import threading
 from app.utils.logger_manager import get_logger
 from app.core.checker import catch_up_episode
@@ -143,6 +144,7 @@ class UpdateManager:
             if on_complete:
                 on_complete()
 
+    # app/core/update_manager.py の update_novels メソッドを修正
     def update_novels(self, novels, progress_queue=None, on_complete=None):
         """
         複数の小説を更新
@@ -180,6 +182,9 @@ class UpdateManager:
             )
             updated_episodes = 0
 
+            # 現在の日時を取得（エピソード更新時に使用）
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
             for i, novel_data in enumerate(novels):
                 n_code, title, current_ep, total_ep, rating = novel_data
 
@@ -194,6 +199,9 @@ class UpdateManager:
                 try:
                     # 不足しているエピソードを取得
                     episode_count = total_ep - current_ep
+
+                    # 更新があるかどうかのフラグ
+                    has_update = False
 
                     for j, ep_no in enumerate(range(current_ep + 1, total_ep + 1)):
                         # 個別の小説の進捗と全体の進捗を計算
@@ -211,9 +219,18 @@ class UpdateManager:
 
                         # データベースに保存
                         if episode_content and episode_title:
-                            self.db_manager.insert_episode(n_code, ep_no, episode_content, episode_title)
+                            # タイムスタンプ付きでエピソードを保存
+                            self.db_manager.insert_episode(n_code, ep_no, episode_content, episode_title, current_time)
+                            has_update = True
 
                         updated_episodes += 1
+
+                    # 更新があった場合、小説テーブルのupdate_atを更新
+                    if has_update:
+                        self.db_manager.execute_query(
+                            "UPDATE novels_descs SET updated_at = ? WHERE n_code = ?",
+                            (current_time, n_code)
+                        )
 
                     # 総エピソード数を更新
                     self.db_manager.update_total_episodes(n_code)
