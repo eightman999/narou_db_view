@@ -183,7 +183,7 @@ class UpdateManager:
             updated_episodes = 0
 
             # 現在の日時を取得（エピソード更新時に使用）
-            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
             for i, novel_data in enumerate(novels):
                 n_code, title, current_ep, total_ep, rating = novel_data
