@@ -413,7 +413,8 @@ def catch_up_episode(n_code, episode_no, rating):
             if title_tag:
                 title = title_tag.get_text(strip=True)
             if novel_body:
-                episode = ''.join(str(p) for p in novel_body.find_all('p'))
+                # 改行を挿入して段落をつなげる
+                episode = '\n\n'.join(p.get_text() for p in novel_body.find_all('p'))
             else:
                 episode = "No content found in the specified div."
         else:
@@ -430,7 +431,8 @@ def catch_up_episode(n_code, episode_no, rating):
             if title_tag:
                 title = title_tag.get_text(strip=True)
             if novel_body:
-                episode = ''.join(str(p) for p in novel_body.find_all('p'))
+                # 改行を挿入して段落をつなげる
+                episode = '\n\n'.join(p.get_text() for p in novel_body.find_all('p'))
             else:
                 episode = "No content found in the specified div."
         else:
@@ -438,7 +440,6 @@ def catch_up_episode(n_code, episode_no, rating):
 
     logger.info(f"Retrieved episode {episode_no} of {n_code}: {title}")
     return episode, title
-
 
 def single_episode(n_code, rating):
     """
@@ -485,7 +486,8 @@ def single_episode(n_code, rating):
             if title_tag:
                 title = title_tag.get_text(strip=True)
             if novel_body:
-                episode = ''.join(str(p) for p in novel_body.find_all('p'))
+                # 改行を挿入して段落をつなげる
+                episode = '\n\n'.join(p.get_text() for p in novel_body.find_all('p'))
             else:
                 episode = "No content found in the specified div."
                 logger.warning(episode)
@@ -504,7 +506,8 @@ def single_episode(n_code, rating):
             if title_tag:
                 title = title_tag.get_text(strip=True)
             if novel_body:
-                episode = ''.join(str(p) for p in novel_body.find_all('p'))
+                # 改行を挿入して段落をつなげる
+                episode = '\n\n'.join(p.get_text() for p in novel_body.find_all('p'))
             else:
                 episode = "No content found in the specified div."
         else:
@@ -512,8 +515,6 @@ def single_episode(n_code, rating):
 
     logger.info(f"Retrieved single episode of {n_code}: {title}")
     return episode, title
-
-
 def dell_dl():
     """ダウンロードディレクトリの.gzファイルを削除"""
     dl_dir = DOWNLOAD_DIR
