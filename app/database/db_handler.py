@@ -610,7 +610,7 @@ class DatabaseHandler:
 
     def find_missing_episodes(self, ncode):
         """
-        指定された小説の欠落しているエピソードを見つける（効率化版）
+        指定された小説の欠落しているエピソードを見つける（単純化版）
 
         Args:
             ncode (str): 小説コード
@@ -618,33 +618,35 @@ class DatabaseHandler:
         Returns:
             list: 欠落しているエピソード番号のリスト
         """
-        # 小説の総エピソード数を取得
-        novel_query = 'SELECT general_all_no FROM novels_descs WHERE n_code = ?'
-        general_all_no_result = self.execute_read_query(novel_query, (ncode,), fetch_all=False)
+        try:
+            # 小説の総エピソード数を取得
+            novel_query = 'SELECT general_all_no FROM novels_descs WHERE n_code = ?'
+            general_all_no_result = self.execute_read_query(novel_query, (ncode,), fetch_all=False)
 
-        if not general_all_no_result or not general_all_no_result[0]:
-            logger.warning(f"小説 {ncode} の general_all_no が設定されていません")
+            if not general_all_no_result or not general_all_no_result[0]:
+                logger.warning(f"小説 {ncode} の general_all_no が設定されていません")
+                return []
+
+            general_all_no = general_all_no_result[0]
+
+            # 存在するエピソード番号を取得
+            episode_query = 'SELECT CAST(episode_no AS INTEGER) as ep_num FROM episodes WHERE ncode = ? ORDER BY ep_num'
+            existing_episodes = self.execute_read_query(episode_query, (ncode,))
+
+            # 既存のエピソード番号をセットに変換（高速な検索のため）
+            existing_set = set(ep[0] for ep in existing_episodes)
+
+            # 1から総エピソード数までの範囲でチェック
+            missing_episodes = []
+            for ep_num in range(1, general_all_no + 1):
+                if ep_num not in existing_set:
+                    missing_episodes.append(ep_num)
+
+            return missing_episodes
+
+        except Exception as e:
+            logger.error(f"欠落エピソード検索エラー: {e}")
             return []
-
-        general_all_no = general_all_no_result[0]
-
-        # 存在するエピソード番号を効率的に取得（SQLで計算）
-        episode_query = '''
-        WITH RECURSIVE numbers(n) AS (
-            SELECT 1
-            UNION ALL
-            SELECT n+1 FROM numbers WHERE n < ?
-        )
-        SELECT n FROM numbers
-        WHERE n NOT IN (
-            SELECT CAST(episode_no AS INTEGER) FROM episodes WHERE ncode = ?
-        )
-        ORDER BY n
-        '''
-
-        missing_episodes = [row[0] for row in self.execute_read_query(episode_query, (general_all_no, ncode))]
-
-        return missing_episodes
 
     # ヘルパーメソッド
     def _chunks(self, lst, n):

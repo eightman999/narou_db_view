@@ -366,7 +366,7 @@ class UpdateManager:
                 progress_queue.put({
                     'show': True,
                     'percent': 0,
-                    'message': f"{total_missing}個の欠落エピソードを取得します..."
+                    'message': f"{total_missing}個の欠落エピソードを取得します...\n欠落エピソード: {', '.join(map(str, missing_episodes))}"
                 })
 
             # 欠落エピソードを取得して保存
@@ -385,7 +385,9 @@ class UpdateManager:
 
                 # データベースに保存
                 if episode_content and episode_title:
-                    self.db_manager.insert_episode(ncode, ep_no, episode_content, episode_title)
+                    # 現在の日時を取得してタイムスタンプとして使用
+                    current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    self.db_manager.insert_episode(ncode, ep_no, episode_content, episode_title, current_time)
 
             # 総エピソード数を更新
             self.db_manager.update_total_episodes(ncode)

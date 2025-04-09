@@ -35,6 +35,7 @@ class UpdatePanel(ttk.Frame):
 
         # 状態管理
         self.shinchaku_novels = []
+        self.novels_with_missing_episodes = []  # 欠落エピソードがある小説のリスト
 
         # 進捗状況管理
         self.progress_queue = queue.Queue()
@@ -47,9 +48,6 @@ class UpdatePanel(ttk.Frame):
         self.progress_frame = None
         self.progress_bar = None
         self.progress_label = None
-
-        # UIの初期化
-        self.init_ui()
 
     def init_ui(self):
         """UIコンポーネントの初期化"""
@@ -185,6 +183,7 @@ class UpdatePanel(ttk.Frame):
         # マウスホイールイベントをバインド
         self.scroll_canvas.bind_all("<MouseWheel>", throttled_scroll_event)
 
+    # show_novels メソッドを修正
     def show_novels(self):
         """更新が必要な小説一覧を表示"""
         # スクロール位置をリセット
@@ -212,10 +211,57 @@ class UpdatePanel(ttk.Frame):
         loading_label.pack(pady=20)
 
     def load_shinchaku_novels(self):
-        """新着小説データの読み込み（バックグラウンドスレッド用）"""
+        """新着小説データの読み込み（バックグラウンドスレッドで実行）"""
         try:
             # 新着情報を取得
             _, self.shinchaku_novels, _ = self.update_manager.check_shinchaku()
+
+            # 欠落エピソードがある小説を検索
+            self.novels_with_missing_episodes = []
+
+            # 更新除外されていない全小説を取得
+            all_novels = self.update_manager.novel_manager.get_all_novels()
+
+            # 進捗状況を初期化
+            total_novels = len(all_novels)
+            progress_step = 0
+
+            for novel in all_novels:
+                # 進捗表示を更新（100冊ごと）
+                progress_step += 1
+                if progress_step % 100 == 0:
+                    progress_percent = int((progress_step / total_novels) * 100)
+                    # メインスレッドへのキューイング
+                    self.root.after(0,
+                                    lambda msg=f"小説の欠落エピソードをチェック中... ({progress_step}/{total_novels})":
+                                    self.progress_label.config(text=msg))
+
+                ncode = novel[0]
+
+                # 更新除外フラグがある場合はスキップ
+                excluded = novel[8] if len(novel) > 8 else 0
+                if excluded == 1:
+                    continue
+
+                # 欠落エピソードを検索
+                missing_episodes = self.update_manager.db_manager.find_missing_episodes(ncode)
+
+                if missing_episodes:
+                    # 欠落エピソードがある場合は、既存の更新リストにない場合のみ追加
+                    if not any(ncode == n[0] for n in self.shinchaku_novels):
+                        # 小説情報を取得
+                        title = novel[1]
+                        current_ep = novel[5] if novel[5] is not None else 0
+                        total_ep = novel[6] if novel[6] is not None else 0
+                        rating = novel[4] if len(novel) > 4 else None
+
+                        # この小説には欠落エピソードがあることを記録
+                        self.novels_with_missing_episodes.append((ncode, title, current_ep, total_ep, rating))
+
+            # 欠落エピソードがある小説を通常の更新リストに追加
+            for novel in self.novels_with_missing_episodes:
+                if not any(novel[0] == n[0] for n in self.shinchaku_novels):
+                    self.shinchaku_novels.append(novel)
 
             # UIの更新はメインスレッドで行う
             self.after(0, self.update_ui)
@@ -245,7 +291,7 @@ class UpdatePanel(ttk.Frame):
         # 更新情報を表示
         info_label = tk.Label(
             self.list_display_frame,
-            text=f"{len(self.shinchaku_novels)}件の小説に更新があります",
+            text=f"{len(self.shinchaku_novels)}件の小説に更新または欠落エピソードがあります",
             bg="#F0F0F0",
             font=("", 12)
         )
@@ -259,8 +305,14 @@ class UpdatePanel(ttk.Frame):
             item_frame = tk.Frame(self.list_display_frame, bg="#F0F0F0")
             item_frame.pack(fill="x", pady=2)
 
+            # 欠落エピソードがある小説かどうか確認
+            is_missing = any(n_code == n[0] for n in self.novels_with_missing_episodes)
+
             # 現在の状態表示
             status_text = f"{current_ep}/{total_ep}話"
+            if is_missing:
+                status_text += " ※"
+
             status_label = tk.Label(
                 item_frame,
                 text=status_text,
@@ -308,6 +360,27 @@ class UpdatePanel(ttk.Frame):
                 item_frame.config(bg="#E8E8E8")
                 status_label.config(bg="#E8E8E8")
                 title_label.config(bg="#E8E8E8")
+
+            # 欠落エピソードがある小説は背景色を変える
+            if is_missing:
+                item_frame.config(bg="#FFECEC")
+                status_label.config(bg="#FFECEC")
+                title_label.config(bg="#FFECEC")
+
+        # 欠落エピソードの説明を追加
+        if any(n_code == n[0] for n in self.shinchaku_novels for n_code in
+               [n2[0] for n2 in self.novels_with_missing_episodes]):
+            note_frame = tk.Frame(self.list_display_frame, bg="#F0F0F0")
+            note_frame.pack(fill="x", pady=10)
+
+            note_label = tk.Label(
+                note_frame,
+                text="※ 印がついている小説には、欠落しているエピソードがあります。",
+                bg="#F0F0F0",
+                font=("", 10),
+                anchor="w"
+            )
+            note_label.pack(side="left", padx=10)
 
     def show_update_confirmation(self, novel_data):
         """
@@ -596,7 +669,7 @@ class UpdatePanel(ttk.Frame):
         # 結果ウィンドウの作成
         result_window = tk.Toplevel(self)
         result_window.title("欠落エピソード")
-        result_window.geometry("400x300")
+        result_window.geometry("400x400")
         result_window.transient(self)  # 親ウィンドウの上に表示
 
         # ウィンドウの中央配置
@@ -619,7 +692,8 @@ class UpdatePanel(ttk.Frame):
             info_frame,
             text=title,
             font=("", 12, "bold"),
-            bg="#F0F0F0"
+            bg="#F0F0F0",
+            wraplength=380
         )
         title_label.pack(fill="x")
 
@@ -630,6 +704,26 @@ class UpdatePanel(ttk.Frame):
             bg="#F0F0F0"
         )
         info_label.pack(fill="x", pady=5)
+
+        # 欠落エピソードのパターン分析
+        patterns = self.analyze_missing_patterns(missing_episodes)
+        pattern_text = "欠落パターン:\n"
+
+        for pattern in patterns:
+            if pattern[0] == "single":
+                pattern_text += f"・単独欠落: エピソード{pattern[1]}\n"
+            elif pattern[0] == "range":
+                pattern_text += f"・連続欠落: エピソード{pattern[1]}～{pattern[2]}\n"
+
+        pattern_label = tk.Label(
+            info_frame,
+            text=pattern_text,
+            font=("", 10),
+            bg="#F0F0F0",
+            justify="left",
+            anchor="w"
+        )
+        pattern_label.pack(fill="x", pady=5, padx=5)
 
         # エピソードリストフレーム
         list_frame = tk.Frame(result_window)
@@ -650,7 +744,8 @@ class UpdatePanel(ttk.Frame):
         scrollbar.config(command=episode_list.yview)
 
         # エピソードリストに追加
-        for ep_no in missing_episodes:
+        sorted_episodes = sorted(missing_episodes)
+        for ep_no in sorted_episodes:
             episode_list.insert(tk.END, f"エピソード {ep_no}")
 
         # ボタンフレーム
@@ -672,6 +767,50 @@ class UpdatePanel(ttk.Frame):
             command=result_window.destroy
         )
         cancel_button.pack(side="right", padx=10)
+
+    def analyze_missing_patterns(self, missing_episodes):
+        """
+        欠落エピソードのパターンを分析
+
+        Args:
+            missing_episodes: 欠落エピソード番号のリスト
+
+        Returns:
+            list: パターンのリスト [('single', ep_no), ('range', start, end), ...]
+        """
+        if not missing_episodes:
+            return []
+
+        # 欠落エピソードを昇順にソート
+        sorted_eps = sorted(missing_episodes)
+
+        patterns = []
+        start_ep = sorted_eps[0]
+        prev_ep = start_ep
+
+        for i in range(1, len(sorted_eps)):
+            current_ep = sorted_eps[i]
+
+            # 連続していないエピソードが見つかった場合
+            if current_ep > prev_ep + 1:
+                # 単独欠落か連続欠落かを判定
+                if start_ep == prev_ep:
+                    patterns.append(("single", start_ep))
+                else:
+                    patterns.append(("range", start_ep, prev_ep))
+
+                # 新しい範囲の開始
+                start_ep = current_ep
+
+            prev_ep = current_ep
+
+        # 最後の範囲を追加
+        if start_ep == prev_ep:
+            patterns.append(("single", start_ep))
+        else:
+            patterns.append(("range", start_ep, prev_ep))
+
+        return patterns
 
     def fetch_missing_episodes(self, ncode, window):
         """
