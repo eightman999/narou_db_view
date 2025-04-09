@@ -186,7 +186,11 @@ class UpdatePanel(ttk.Frame):
     # show_novels メソッドを修正
     def show_novels(self):
         """更新が必要な小説一覧を表示"""
-        # スクロール位置をリセット
+        # Check if scroll_canvas has been initialized
+        if not hasattr(self, 'scroll_canvas') or self.scroll_canvas is None:
+            self.init_ui()  # Make sure UI is initialized
+
+        # Now that we're sure scroll_canvas exists, reset scroll position
         self.scroll_canvas.yview_moveto(0)
 
         # ローディング表示
