@@ -236,7 +236,7 @@ class UpdatePanel(ttk.Frame):
                 if progress_step % 100 == 0:
                     progress_percent = int((progress_step / total_novels) * 100)
                     # メインスレッドへのキューイング
-                    self.root.after(0,
+                    self.after(0,
                                     lambda msg=f"小説の欠落エピソードをチェック中... ({progress_step}/{total_novels})":
                                     self.progress_label.config(text=msg))
 
