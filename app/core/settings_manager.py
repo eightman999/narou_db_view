@@ -42,8 +42,14 @@ class SettingsManager:
 
         # 設定ファイルが存在するか確認
         if os.path.exists(self.config_file):
-            config.read(self.config_file)
-
+            try:
+                # 明示的にエンコーディングを指定
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    config.read_file(f)
+            except UnicodeDecodeError:
+                # UTF-8で読めない場合は、システムのデフォルトエンコーディングで試す
+                with open(self.config_file, 'r') as f:
+                    config.read_file(f)
         # Settings セクションが存在しない場合は作成
         if not config.has_section('Settings'):
             config.add_section('Settings')
