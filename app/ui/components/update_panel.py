@@ -68,6 +68,9 @@ class UpdatePanel(ttk.Frame):
         self.checkbox_vars = {}  # チェックボックスの変数を保持する辞書 {n_code: BooleanVar}
         self.last_check_label = None  # 最終更新確認時刻を表示するラベル
 
+        # UIを初期化
+        self.init_ui()
+
     def check_first_run(self):
         """
         アプリが初回起動かどうかを確認する
@@ -284,6 +287,8 @@ class UpdatePanel(ttk.Frame):
 
         except queue.Empty:
             pass
+        except Exception as e:
+            logger.error(f"進捗キュー処理中にエラーが発生しました: {e}")
 
         # 定期的にキューをチェック（100ミリ秒ごと）
         self.after(100, self.check_progress_queue)
@@ -331,10 +336,6 @@ class UpdatePanel(ttk.Frame):
 
     def show_novels(self):
         """更新が必要な小説一覧を表示"""
-        # UIが初期化されていない場合は初期化
-        if not hasattr(self, 'scroll_canvas') or self.scroll_canvas is None:
-            self.init_ui()
-
         # スクロール位置をリセット
         self.scroll_canvas.yview_moveto(0)
 
