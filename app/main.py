@@ -10,6 +10,7 @@ from tkinter import ttk, messagebox
 import threading
 import queue
 
+from app.core.checker import del_yml, dell_dl
 # モジュールのインポート
 from app.ui.components.novel_list import NovelListView
 from app.ui.components.episode_list import EpisodeListView
@@ -510,6 +511,8 @@ class NovelViewerApp:
 
 def main():
     """アプリケーションのエントリーポイント"""
+    del_yml()
+    dell_dl()
     app = NovelViewerApp()
     app.run()
 

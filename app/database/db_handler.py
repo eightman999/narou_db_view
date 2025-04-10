@@ -641,7 +641,7 @@ class DatabaseHandler:
             for ep_num in range(1, general_all_no + 1):
                 if ep_num not in existing_set:
                     missing_episodes.append(ep_num)
-
+            logger.info(f"小説 {ncode} - 欠落エピソード: {missing_episodes} - 総エピソード数: {general_all_no} - 存在するエピソード数: {len(existing_episodes)}")
             return missing_episodes
 
         except Exception as e:
