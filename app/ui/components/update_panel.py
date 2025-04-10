@@ -45,6 +45,7 @@ class UpdatePanel(ttk.Frame):
         self.novels_with_missing_episodes = []  # 欠落エピソードがある小説のリスト
         self.selected_novels = {}  # 選択された小説を追跡するための辞書 {n_code: bool}
         self.last_check_time = UpdatePanel._last_check_time
+        self.currently_updating_novels = []  # 現在更新中の小説のリスト
 
         # 初回起動管理用の設定ファイルパス
         self.config_file = os.path.join('config', 'app_state.json')
@@ -710,6 +711,7 @@ class UpdatePanel(ttk.Frame):
 
         # 更新処理を開始
         self.update_in_progress = True
+        self.currently_updating_novels = selected_list.copy()  # 更新中の小説リストを保持
         self.progress_queue.put({
             'show': True,
             'percent': 0,
@@ -719,6 +721,7 @@ class UpdatePanel(ttk.Frame):
         # 更新を実行（コールバック経由）
         if self.update_callback:
             self.update_callback(selected_list)
+
     def show_update_confirmation(self, novel_data):
         """
         更新確認ダイアログを表示
