@@ -846,88 +846,6 @@ class UpdatePanel(ttk.Frame):
             args=(novel_data,)
         ).start()
 
-    def update_single_novel(self, novel_data):
-        """
-        単一の小説を更新（非同期処理用）
-
-        Args:
-            novel_data: 小説データ (n_code, title, current_ep, total_ep, rating)
-        """
-        try:
-            n_code, title, current_ep, total_ep, rating = novel_data
-            missing_episodes = total_ep - current_ep
-
-            # 更新が必要ないなら終了
-            if missing_episodes <= 0:
-                self.progress_queue.put({
-                    'show': False,
-                    'message': ""
-                })
-                self.update_in_progress = False
-                return
-
-            # 欠落エピソードの取得と保存
-            for i, ep_no in enumerate(range(current_ep + 1, total_ep + 1)):
-                # 進捗率の計算
-                progress_percent = int((i / missing_episodes) * 100)
-
-                # 進捗表示の更新
-                self.progress_queue.put({
-                    'percent': progress_percent,
-                    'message': f"小説 [{title}] のエピソード {ep_no}/{total_ep} を取得中... ({progress_percent}%)"
-                })
-
-                try:
-                    # エピソードを取得
-                    episode_content, episode_title = catch_up_episode(n_code, ep_no, rating)
-
-                    # データベースに保存
-                    if episode_content and episode_title:
-                        self.update_manager.db_manager.insert_episode(n_code, ep_no, episode_content, episode_title)
-                    else:
-                        logger.warning(f"エピソード {ep_no} の取得に失敗しました")
-
-                except Exception as e:
-                    logger.error(f"エピソード {ep_no} の処理中にエラーが発生しました: {e}")
-                    # エラーが発生しても処理を続行
-
-            # 総エピソード数を更新
-            self.update_manager.db_manager.update_total_episodes(n_code)
-
-            # 小説キャッシュをクリア
-            self.update_manager.novel_manager.clear_cache(n_code)
-
-            # 完了表示の更新
-            self.progress_queue.put({
-                'percent': 100,
-                'message': f"小説 [{title}] の更新が完了しました"
-            })
-
-            # 3秒後に進捗表示を非表示にする
-            self.after(3000, lambda: self.progress_queue.put({'show': False}))
-
-            # 更新情報を再取得して表示を更新
-            self.after(3500, lambda: self.show_novels())
-
-            # 更新完了コールバックを呼び出し
-            if self.on_complete_callback:
-                self.after(3500, self.on_complete_callback)
-
-        except Exception as e:
-            logger.error(f"小説 {novel_data[0]} の更新中にエラーが発生しました: {e}")
-
-            # エラー表示
-            self.progress_queue.put({
-                'percent': 0,
-                'message': f"エラー: {e}"
-            })
-
-            # 3秒後に進捗表示を非表示にする
-            self.after(3000, lambda: self.progress_queue.put({'show': False}))
-
-        finally:
-            self.update_in_progress = False
-
     def update_all_novels(self):
         """すべての新着小説を更新"""
         if not self.shinchaku_novels:
@@ -1095,3 +1013,215 @@ class UpdatePanel(ttk.Frame):
             font=("", 12)
         )
         error_label.pack(pady=20)
+
+    def update_single_novel(self, novel_data):
+        """
+        単一の小説を更新（非同期処理用）
+
+        Args:
+            novel_data: 小説データ (n_code, title, current_ep, total_ep, rating)
+        """
+        try:
+            n_code, title, current_ep, total_ep, rating = novel_data
+            missing_episodes = total_ep - current_ep
+
+            # 更新が必要ないなら終了
+            if missing_episodes <= 0:
+                self.progress_queue.put({
+                    'show': False,
+                    'message': ""
+                })
+                self.update_in_progress = False
+                return
+
+            # 欠落エピソードの取得と保存
+            for i, ep_no in enumerate(range(current_ep + 1, total_ep + 1)):
+                # 進捗率の計算
+                progress_percent = int((i / missing_episodes) * 100)
+
+                # 進捗表示の更新
+                self.progress_queue.put({
+                    'percent': progress_percent,
+                    'message': f"小説 [{title}] のエピソード {ep_no}/{total_ep} を取得中... ({progress_percent}%)"
+                })
+
+                try:
+                    # エピソードを取得
+                    episode_content, episode_title = catch_up_episode(n_code, ep_no, rating)
+
+                    # データベースに保存
+                    if episode_content and episode_title:
+                        self.update_manager.db_manager.insert_episode(n_code, ep_no, episode_content, episode_title)
+                    else:
+                        logger.warning(f"エピソード {ep_no} の取得に失敗しました")
+
+                except Exception as e:
+                    logger.error(f"エピソード {ep_no} の処理中にエラーが発生しました: {e}")
+                    # エラーが発生しても処理を続行
+
+            # 総エピソード数を更新
+            self.update_manager.db_manager.update_total_episodes(n_code)
+
+            # 小説キャッシュをクリア
+            self.update_manager.novel_manager.clear_cache(n_code)
+
+            # 完了表示の更新
+            self.progress_queue.put({
+                'percent': 100,
+                'message': f"小説 [{title}] の更新が完了しました"
+            })
+
+            # 更新後に再チェックして状態を確認
+            self.after(1000, lambda: self.recheck_novel_status(n_code, title, rating))
+
+        except Exception as e:
+            logger.error(f"小説 {novel_data[0]} の更新中にエラーが発生しました: {e}")
+
+            # エラー表示
+            self.progress_queue.put({
+                'percent': 0,
+                'message': f"エラー: {e}"
+            })
+
+            # 3秒後に進捗表示を非表示にする
+            self.after(3000, lambda: self.progress_queue.put({'show': False}))
+
+        finally:
+            self.update_in_progress = False
+
+    def recheck_novel_status(self, ncode, title, rating):
+        """
+        更新後に小説の状態を再確認
+
+        Args:
+            ncode: 小説コード
+            title: 小説タイトル
+            rating: レーティング
+        """
+        try:
+            self.progress_queue.put({
+                'message': f"小説 [{title}] の状態を再確認中..."
+            })
+
+            # 小説の最新情報を取得
+            novel = self.update_manager.novel_manager.get_novel(ncode)
+            if not novel:
+                logger.warning(f"小説 {ncode} の情報が見つかりません")
+                return
+
+            current_ep = novel[5] if novel[5] is not None else 0
+            total_ep = novel[6] if novel[6] is not None else 0
+
+            # 欠落エピソードを検索
+            missing_episodes = self.update_manager.db_manager.find_missing_episodes(ncode)
+
+            # 更新リストから該当小説を探す
+            novel_index = None
+            for i, novel_data in enumerate(self.shinchaku_novels):
+                if novel_data[0] == ncode:
+                    novel_index = i
+                    break
+
+            if novel_index is not None:
+                if current_ep >= total_ep and not missing_episodes:
+                    # 更新完了かつ欠落なしの場合はリストから削除
+                    self.progress_queue.put({
+                        'message': f"小説 [{title}] は完全に更新されました。リストから削除します。"
+                    })
+
+                    # リストから削除
+                    del self.shinchaku_novels[novel_index]
+                    # クラス変数も更新
+                    UpdatePanel._shinchaku_novels = self.shinchaku_novels
+
+                    # UIを更新
+                    self.after(2000, self.update_ui)
+                else:
+                    # まだ更新が必要な場合は最新の情報に更新
+                    new_novel_data = (ncode, title, current_ep, total_ep, rating)
+                    self.shinchaku_novels[novel_index] = new_novel_data
+                    UpdatePanel._shinchaku_novels = self.shinchaku_novels
+
+                    if missing_episodes:
+                        self.progress_queue.put({
+                            'message': f"小説 [{title}] にはまだ{len(missing_episodes)}個の欠落エピソードがあります。"
+                        })
+                    elif current_ep < total_ep:
+                        self.progress_queue.put({
+                            'message': f"小説 [{title}] にはまだ{total_ep - current_ep}話の未取得エピソードがあります。"
+                        })
+
+                    # UIを更新
+                    self.after(2000, self.update_ui)
+
+            # 3秒後に進捗表示を非表示にする
+            self.after(3000, lambda: self.progress_queue.put({'show': False}))
+
+            # 更新完了コールバックを呼び出し
+            if self.on_complete_callback:
+                self.after(3500, self.on_complete_callback)
+
+        except Exception as e:
+            logger.error(f"小説 {ncode} の再確認中にエラーが発生しました: {e}")
+            self.progress_queue.put({
+                'message': f"再確認エラー: {e}"
+            })
+
+            # 3秒後に進捗表示を非表示にする
+            self.after(3000, lambda: self.progress_queue.put({'show': False}))
+
+    # 一括更新完了後の処理を改良
+    def on_update_complete(self):
+        """更新完了時の処理"""
+        self.update_in_progress = False
+
+        # 現在の小説リストをコピー（反復処理中に削除するため）
+        current_novels = self.currently_updating_novels.copy() if hasattr(self, 'currently_updating_novels') else []
+
+        if current_novels:
+            # 更新された小説を順番に再チェック
+            self.progress_queue.put({
+                'show': True,
+                'percent': 100,
+                'message': "更新された小説の状態を再確認しています..."
+            })
+
+            # 少し待ってから再チェック開始（DBの更新を確実にするため）
+            self.after(1000, lambda: self.start_batch_rechecking(current_novels))
+        else:
+            # 更新情報を再取得して表示を更新
+            shinchaku_info = self.update_manager.check_shinchaku()
+            self.shinchaku_novels = shinchaku_info[1]
+            UpdatePanel._shinchaku_novels = self.shinchaku_novels
+
+            # UIを更新
+            self.update_ui()
+
+            # 進捗表示を非表示
+            self.after(1000, lambda: self.progress_queue.put({'show': False}))
+
+    def start_batch_rechecking(self, novels_to_check):
+        """
+        一括で小説の状態を再確認
+
+        Args:
+            novels_to_check: 再チェックする小説のリスト
+        """
+        if not novels_to_check:
+            # すべての再チェックが完了したらUIを更新
+            self.update_ui()
+
+            # 進捗表示を非表示
+            self.after(1000, lambda: self.progress_queue.put({'show': False}))
+            return
+
+        # 先頭の小説を取り出して再チェック
+        novel = novels_to_check.pop(0)
+        ncode, title = novel[0], novel[1]
+        rating = novel[4] if len(novel) > 4 else None
+
+        # 再チェック実行
+        self.recheck_novel_status(ncode, title, rating)
+
+        # 少し待ってから次の小説を再チェック
+        self.after(1500, lambda: self.start_batch_rechecking(novels_to_check))
