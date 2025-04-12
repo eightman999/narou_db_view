@@ -177,8 +177,9 @@ class UpdateManager:
                 })
 
             # 全体の進捗計算用
+            # 全体の進捗計算
             total_episodes_to_update = sum(
-                novel[3] - novel[2] for novel in novels if novel[3] > novel[2]
+                int(novel[3]) - int(novel[2]) for novel in novels if int(novel[3]) > int(novel[2])
             )
             updated_episodes = 0
 
