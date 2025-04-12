@@ -106,6 +106,11 @@ def load_conf():
 
     return font, fontsize, backgroundcolor
 
+def process_n_code_rating(n_code_rating):
+    """個別の小説コードとレーティングを処理"""
+    n_code, rating = n_code_rating
+    logger.info(f"Checking {n_code}...")
+    update_check(n_code, rating)
 
 def existence_check(ncode):
     """
@@ -234,11 +239,6 @@ def db_update():
         fetch=True
     )
 
-    def process_n_code_rating(n_code_rating):
-        n_code, rating = n_code_rating
-        logger.info(f"Checking {n_code}...")
-        update_check(n_code, rating)
-
     # ThreadPoolExecutorを使用してマルチスレッドで処理
     with ThreadPoolExecutor(max_workers=10) as executor:
         executor.map(process_n_code_rating, n_codes_ratings)
@@ -250,7 +250,6 @@ def db_update():
     # YAMLファイルからデータを更新
     yml_parse_time(n_codes_ratings)
     logger.info("Updated database successfully")
-
 
 def yml_parse_time(n_codes_ratings):
     """

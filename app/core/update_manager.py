@@ -47,9 +47,13 @@ class UpdateManager:
                 self.shinchaku_novels = []
 
                 for n_code, title, current_ep, general_all_no, rating in needs_update:
-                    self.shinchaku_ep += (general_all_no - current_ep)
+                    # 安全にint型に変換
+                    current_ep_int = int(current_ep) if current_ep is not None else 0
+                    general_all_no_int = int(general_all_no) if general_all_no is not None else 0
+
+                    self.shinchaku_ep += (general_all_no_int - current_ep_int)
                     self.shinchaku_count += 1
-                    self.shinchaku_novels.append((n_code, title, current_ep, general_all_no, rating))
+                    self.shinchaku_novels.append((n_code, title, current_ep_int, general_all_no_int, rating))
 
                 logger.info(f"新着: {self.shinchaku_count}件{self.shinchaku_ep}話")
                 return self.shinchaku_ep, self.shinchaku_novels, self.shinchaku_count
@@ -71,6 +75,7 @@ class UpdateManager:
             n_code = novel[0]
             title = novel[1] if len(novel) > 1 else "不明なタイトル"
 
+            # 安全にint型に変換
             current_ep = int(novel[5]) if len(novel) > 5 and novel[5] is not None else 0
             total_ep = int(novel[6]) if len(novel) > 6 and novel[6] is not None else 0
             rating = novel[4] if len(novel) > 4 else None
@@ -144,7 +149,6 @@ class UpdateManager:
             if on_complete:
                 on_complete()
 
-    # app/core/update_manager.py の update_novels メソッドを修正
     def update_novels(self, novels, progress_queue=None, on_complete=None):
         """
         複数の小説を更新
@@ -177,9 +181,10 @@ class UpdateManager:
                 })
 
             # 全体の進捗計算用
-            # 全体の進捗計算
+            # 安全にint型に変換して計算
             total_episodes_to_update = sum(
-                int(novel[3]) - int(novel[2]) for novel in novels if int(novel[3]) > int(novel[2])
+                int(novel[3]) - int(novel[2]) for novel in novels
+                if novel[3] is not None and novel[2] is not None and int(novel[3]) > int(novel[2])
             )
             updated_episodes = 0
 
@@ -188,6 +193,10 @@ class UpdateManager:
 
             for i, novel_data in enumerate(novels):
                 n_code, title, current_ep, total_ep, rating = novel_data
+
+                # 安全にint型に変換
+                current_ep_int = int(current_ep) if current_ep is not None else 0
+                total_ep_int = int(total_ep) if total_ep is not None else 0
 
                 novel_progress = (i / total) * 100
 
@@ -199,12 +208,12 @@ class UpdateManager:
 
                 try:
                     # 不足しているエピソードを取得
-                    episode_count = total_ep - current_ep
+                    episode_count = total_ep_int - current_ep_int
 
                     # 更新があるかどうかのフラグ
                     has_update = False
 
-                    for j, ep_no in enumerate(range(current_ep + 1, total_ep + 1)):
+                    for j, ep_no in enumerate(range(current_ep_int + 1, total_ep_int + 1)):
                         # 個別の小説の進捗と全体の進捗を計算
                         episode_progress = j / episode_count if episode_count > 0 else 1
                         overall_progress = novel_progress + (episode_progress * (100 / total))
@@ -212,7 +221,7 @@ class UpdateManager:
                         if progress_queue:
                             progress_queue.put({
                                 'percent': int(overall_progress),
-                                'message': f"[{i + 1}/{total}] {title} - エピソード {ep_no}/{total_ep} を取得中..."
+                                'message': f"[{i + 1}/{total}] {title} - エピソード {ep_no}/{total_ep_int} を取得中..."
                             })
 
                         # エピソードを取得
@@ -445,7 +454,10 @@ class UpdateManager:
             rating = novel[4] if len(novel) > 4 else None
             general_all_no = novel[6] if len(novel) > 6 else None
 
-            if not general_all_no or general_all_no <= 0:
+            # 安全にint型に変換
+            general_all_no_int = int(general_all_no) if general_all_no is not None else 0
+
+            if not general_all_no or general_all_no_int <= 0:
                 if progress_queue:
                     progress_queue.put({
                         'show': True,
@@ -470,18 +482,18 @@ class UpdateManager:
             if progress_queue:
                 progress_queue.put({
                     'percent': 0,
-                    'message': f"既存のエピソードを削除しました。全{general_all_no}話を再取得します..."
+                    'message': f"既存のエピソードを削除しました。全{general_all_no_int}話を再取得します..."
                 })
 
             # すべてのエピソードを取得して保存
-            for i, ep_no in enumerate(range(1, general_all_no + 1)):
+            for i, ep_no in enumerate(range(1, general_all_no_int + 1)):
                 # 進捗率計算
-                progress_percent = int((i / general_all_no) * 100)
+                progress_percent = int((i / general_all_no_int) * 100)
 
                 if progress_queue:
                     progress_queue.put({
                         'percent': progress_percent,
-                        'message': f"エピソード {ep_no}/{general_all_no} を取得中... ({progress_percent}%)"
+                        'message': f"エピソード {ep_no}/{general_all_no_int} を取得中... ({progress_percent}%)"
                     })
 
                 # エピソードを取得
@@ -507,6 +519,115 @@ class UpdateManager:
 
         except Exception as e:
             logger.error(f"全エピソード再取得エラー: {e}")
+            if progress_queue:
+                progress_queue.put({
+                    'percent': 0,
+                    'message': f"エラー: {e}"
+                })
+
+        finally:
+            # 更新情報を再チェック
+            self.check_shinchaku()
+
+            # 完了コールバックの呼び出し
+            if on_complete:
+                on_complete()
+
+    def update_specific_episodes(self, ncode, episode_list, progress_queue=None, on_complete=None):
+        """
+        指定された小説の特定エピソードのみを更新
+
+        Args:
+            ncode (str): 小説コード
+            episode_list (list): 更新するエピソード番号のリスト
+            progress_queue (Queue, optional): 進捗状況を通知するキュー
+            on_complete (callable, optional): 完了時に呼び出すコールバック関数
+        """
+        try:
+            # この小説のデータを取得
+            novel = self.novel_manager.get_novel(ncode)
+            if not novel:
+                if progress_queue:
+                    progress_queue.put({
+                        'show': True,
+                        'percent': 0,
+                        'message': f"エラー: 小説 {ncode} が見つかりません"
+                    })
+
+                if on_complete:
+                    on_complete()
+                return
+
+            title = novel[1]
+            rating = novel[4] if len(novel) > 4 else None
+
+            # 指定されたエピソードが空の場合
+            if not episode_list:
+                if progress_queue:
+                    progress_queue.put({
+                        'show': True,
+                        'percent': 100,
+                        'message': f"小説 [{title}] に更新するエピソードはありません"
+                    })
+
+                if on_complete:
+                    on_complete()
+                return
+
+            total_episodes = len(episode_list)
+
+            if progress_queue:
+                progress_queue.put({
+                    'show': True,
+                    'percent': 0,
+                    'message': f"小説 [{title}] の {total_episodes} 話を更新します"
+                })
+
+            # 現在の日時を取得（エピソード更新時に使用）
+            current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+            # エピソードを取得して保存
+            for i, ep_no in enumerate(episode_list):
+                # 進捗率計算
+                progress_percent = int((i / total_episodes) * 100)
+
+                if progress_queue:
+                    progress_queue.put({
+                        'percent': progress_percent,
+                        'message': f"エピソード {i + 1}/{total_episodes} (No.{ep_no}) を取得中... ({progress_percent}%)"
+                    })
+
+                # エピソードを取得
+                episode_content, episode_title = catch_up_episode(ncode, ep_no, rating)
+
+                # データベースに保存
+                if episode_content and episode_title:
+                    self.db_manager.insert_episode(ncode, ep_no, episode_content, episode_title, current_time)
+                else:
+                    logger.warning(f"エピソード {ncode}-{ep_no} の取得に失敗しました")
+
+            # 総エピソード数を更新
+            self.db_manager.update_total_episodes(ncode)
+
+            # 小説テーブルのupdate_atを更新
+            self.db_manager.execute_query(
+                "UPDATE novels_descs SET updated_at = ? WHERE n_code = ?",
+                (current_time, ncode)
+            )
+
+            # 小説キャッシュをクリア
+            self.novel_manager.clear_cache(ncode)
+
+            if progress_queue:
+                progress_queue.put({
+                    'percent': 100,
+                    'message': f"小説 [{title}] の指定エピソード {total_episodes}話の更新が完了しました"
+                })
+
+            logger.info(f"小説 {ncode} の指定エピソード {total_episodes}話の更新が完了しました")
+
+        except Exception as e:
+            logger.error(f"指定エピソード更新エラー: {e}")
             if progress_queue:
                 progress_queue.put({
                     'percent': 0,
