@@ -629,9 +629,9 @@ class UpdatePanel(ttk.Frame):
             title_label.pack(side="left", padx=5, fill="x", expand=True)
 
             # 更新ボタンのコマンドを状況に応じて変更
+            # 更新ボタンのコマンドを状況に応じて変更
             if is_missing and missing_episodes:
-                update_command = lambda ncode=n_code, t=title, r=rating,
-                                        m=missing_episodes: self.show_episode_selection_dialog(ncode, t, r, m)
+                update_command = lambda ncode=n_code, t=title, r=rating, m=missing_episodes: self.show_episode_selection_dialog(ncode, t, r, m)
                 button_text = "欠落更新"
             else:
                 update_command = lambda novel=novel_data: self.show_update_confirmation(novel)
