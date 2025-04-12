@@ -12,3 +12,5 @@ app/settings.ini
 *.db-wal
 *.ini
 *.db-shm
+app/database/db_files/novel_status.db-wal
+app/database/db_files/novel_status.db-shm
