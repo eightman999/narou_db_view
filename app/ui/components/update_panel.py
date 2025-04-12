@@ -493,6 +493,8 @@ class UpdatePanel(ttk.Frame):
             # 更新確認ボタンを有効化
             self.after(0, lambda: self.update_check_button.config(state="normal"))
 
+    # app/ui/components/update_panel.py の update_ui メソッド内の問題箇所を修正
+
     def update_ui(self):
         """UIの更新"""
         # 前のリストをクリア
@@ -575,6 +577,17 @@ class UpdatePanel(ttk.Frame):
         for i, novel_data in enumerate(self.shinchaku_novels):
             n_code, title, current_ep, total_ep, rating = novel_data
 
+            # 文字列型を整数型に変換（エラー対策）
+            if isinstance(current_ep, str):
+                current_ep = int(current_ep) if current_ep.isdigit() else 0
+            else:
+                current_ep = int(current_ep) if current_ep is not None else 0
+
+            if isinstance(total_ep, str):
+                total_ep = int(total_ep) if total_ep.isdigit() else 0
+            else:
+                total_ep = int(total_ep) if total_ep is not None else 0
+
             # 項目用フレーム
             item_frame = tk.Frame(self.list_display_frame, bg="#F0F0F0")
             item_frame.pack(fill="x", pady=2)
@@ -642,7 +655,8 @@ class UpdatePanel(ttk.Frame):
                 update_command = lambda ncode=n_code, t=title, r=rating, m=missing_episodes: self.show_episode_selection_dialog(ncode, t, r, m)
                 button_text = "欠落更新"
             else:
-                update_command = lambda novel=novel_data: self.show_update_confirmation(novel)
+                update_command = lambda \
+                    novel=(n_code, title, current_ep, total_ep, rating): self.show_update_confirmation(novel)
                 button_text = "更新"
 
             # 更新ボタン
@@ -1121,11 +1135,26 @@ class UpdatePanel(ttk.Frame):
                 logger.warning(f"小説 {ncode} の情報が見つかりません")
                 return
 
+            # 文字列型を整数型に変換（エラー対策）
             current_ep = novel[5] if novel[5] is not None else 0
             total_ep = novel[6] if novel[6] is not None else 0
 
+            if isinstance(current_ep, str):
+                current_ep = int(current_ep) if current_ep.isdigit() else 0
+            else:
+                current_ep = int(current_ep) if current_ep is not None else 0
+
+            if isinstance(total_ep, str):
+                total_ep = int(total_ep) if total_ep.isdigit() else 0
+            else:
+                total_ep = int(total_ep) if total_ep is not None else 0
+
             # 欠落エピソードを検索
             missing_episodes = self.update_manager.db_manager.find_missing_episodes(ncode)
+
+            # ログにデバッグ情報を出力
+            logger.debug(
+                f"再確認: {ncode} - {title} - current_ep: {current_ep}, total_ep: {total_ep}, missing: {len(missing_episodes) if missing_episodes else 0}")
 
             # 更新リストから該当小説を探す
             novel_index = None
@@ -1135,8 +1164,8 @@ class UpdatePanel(ttk.Frame):
                     break
 
             if novel_index is not None:
-                if current_ep >= total_ep and not missing_episodes:
-                    # 更新完了かつ欠落なしの場合はリストから削除
+                # 更新が完了かつ欠落なしの場合（または欠落エピソードが空リストの場合）
+                if current_ep >= total_ep and (not missing_episodes or len(missing_episodes) == 0):
                     self.progress_queue.put({
                         'message': f"小説 [{title}] は完全に更新されました。リストから削除します。"
                     })
@@ -1154,13 +1183,17 @@ class UpdatePanel(ttk.Frame):
                     self.shinchaku_novels[novel_index] = new_novel_data
                     UpdatePanel._shinchaku_novels = self.shinchaku_novels
 
-                    if missing_episodes:
+                    if missing_episodes and len(missing_episodes) > 0:
                         self.progress_queue.put({
                             'message': f"小説 [{title}] にはまだ{len(missing_episodes)}個の欠落エピソードがあります。"
                         })
                     elif current_ep < total_ep:
                         self.progress_queue.put({
                             'message': f"小説 [{title}] にはまだ{total_ep - current_ep}話の未取得エピソードがあります。"
+                        })
+                    else:
+                        self.progress_queue.put({
+                            'message': f"小説 [{title}] の再確認が完了しました。"
                         })
 
                     # UIを更新
@@ -1190,6 +1223,9 @@ class UpdatePanel(ttk.Frame):
         # 現在の小説リストをコピー（反復処理中に削除するため）
         current_novels = self.currently_updating_novels.copy() if hasattr(self, 'currently_updating_novels') else []
 
+        # 現在更新中リストをクリア
+        self.currently_updating_novels = []
+
         if current_novels:
             # 更新された小説を順番に再チェック
             self.progress_queue.put({
@@ -1211,6 +1247,10 @@ class UpdatePanel(ttk.Frame):
 
             # 進捗表示を非表示
             self.after(1000, lambda: self.progress_queue.put({'show': False}))
+
+            # 更新完了コールバックを呼び出し
+            if self.on_complete_callback:
+                self.after(1500, self.on_complete_callback)
 
     def start_batch_rechecking(self, novels_to_check):
         """

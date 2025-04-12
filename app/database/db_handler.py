@@ -629,6 +629,12 @@ class DatabaseHandler:
 
             general_all_no = general_all_no_result[0]
 
+            # general_all_noが文字列の場合は整数に変換
+            if isinstance(general_all_no, str):
+                general_all_no = int(general_all_no) if general_all_no.isdigit() else 0
+            else:
+                general_all_no = int(general_all_no) if general_all_no is not None else 0
+
             # 存在するエピソード番号を取得
             episode_query = 'SELECT CAST(episode_no AS INTEGER) as ep_num FROM episodes WHERE ncode = ? ORDER BY ep_num'
             existing_episodes = self.execute_read_query(episode_query, (ncode,))
@@ -641,7 +647,9 @@ class DatabaseHandler:
             for ep_num in range(1, general_all_no + 1):
                 if ep_num not in existing_set:
                     missing_episodes.append(ep_num)
-            logger.info(f"小説 {ncode} - 欠落エピソード: {missing_episodes} - 総エピソード数: {general_all_no} - 存在するエピソード数: {len(existing_episodes)}")
+
+            logger.info(
+                f"小説 {ncode} - 欠落エピソード: {missing_episodes} - 総エピソード数: {general_all_no} - 存在するエピソード数: {len(existing_episodes)}")
             return missing_episodes
 
         except Exception as e:

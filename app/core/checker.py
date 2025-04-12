@@ -366,6 +366,7 @@ def yml_parse_time(n_codes_ratings):
         except Exception as e:
             logger.error(f"Database update failed for {n_code}: {e}")
 
+
 def ncode_title(n_code):
     """
     小説コードからタイトルを取得
@@ -416,6 +417,14 @@ def catch_up_episode(n_code, episode_no, rating):
     Returns:
         tuple: (エピソード本文, エピソードタイトル)
     """
+    # データベースから小説の総エピソード数を取得
+    novel = db.get_novel_by_ncode(n_code)
+    general_all_no = novel[6] if novel and len(novel) > 6 and novel[6] is not None else None
+
+    # 一話完結小説または総エピソード数が1の場合は別のURLでアクセス
+    if general_all_no == 1 and int(episode_no) == 1:
+        return single_episode(n_code, rating)
+
     title = ""
     episode = ""
     EP_url = f"https://ncode.syosetu.com/{n_code}/{episode_no}/"
@@ -477,6 +486,7 @@ def catch_up_episode(n_code, episode_no, rating):
     logger.info(f"Retrieved episode {episode_no} of {n_code}: {title}")
     return episode, title
 
+
 def single_episode(n_code, rating):
     """
     一話完結小説用のエピソード取得
@@ -490,11 +500,11 @@ def single_episode(n_code, rating):
     """
     title = ""
     episode = ""
-    EP_url = f"https://ncode.syosetu.com/{n_code}"
-    logger.info(f"Checking {n_code}...(rating: {rating})")
+    EP_url = f"https://ncode.syosetu.com/{n_code}/"
+    logger.info(f"Checking {n_code}...(rating: {rating}) as single episode novel")
 
     if rating == 1:
-        EP_url = f"https://novel18.syosetu.com/{n_code}"
+        EP_url = f"https://novel18.syosetu.com/{n_code}/"
         options = Options()
         options.add_argument('--headless')
         options.add_argument('--disable-gpu')
@@ -551,6 +561,8 @@ def single_episode(n_code, rating):
 
     logger.info(f"Retrieved single episode of {n_code}: {title}")
     return episode, title
+
+
 def dell_dl():
     """ダウンロードディレクトリの.gzファイルを削除"""
     dl_dir = DOWNLOAD_DIR
