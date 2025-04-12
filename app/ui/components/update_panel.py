@@ -397,7 +397,12 @@ class UpdatePanel(ttk.Frame):
             self.after(0, lambda: self.update_check_button.config(state="disabled"))
 
             # 新着情報を取得
+            logger.debug("新着情報の取得開始")
             _, shinchaku_novels, _ = self.update_manager.check_shinchaku()
+            logger.debug(f"新着小説数: {len(shinchaku_novels)}")
+            for i, novel in enumerate(shinchaku_novels):
+                logger.debug(f"新着小説 {i + 1}: {novel}")
+
             self.shinchaku_novels = shinchaku_novels
 
             # クラス変数にも保存して永続化
@@ -414,18 +419,21 @@ class UpdatePanel(ttk.Frame):
             self.novels_with_missing_episodes = []
 
             # 更新除外されていない全小説を取得
+            logger.debug("全小説の取得開始")
             all_novels = self.update_manager.novel_manager.get_all_novels()
+            logger.debug(f"全小説数: {len(all_novels)}")
 
             # 進捗状況を初期化
             total_novels = len(all_novels)
             progress_step = 0
 
             # 進捗表示
-            self.after(0, lambda: self.progress_frame.pack(fill="x", pady=5, padx=10, after=self.scrollable_frame.winfo_children()[0]))
+            self.after(0, lambda: self.progress_frame.pack(fill="x", pady=5, padx=10,
+                                                           after=self.scrollable_frame.winfo_children()[0]))
             self.after(0, lambda: self.progress_label.config(text="小説の欠落エピソードをチェック中..."))
             self.after(0, lambda: self.progress_bar.config(value=0))
 
-            for novel in all_novels:
+            for i, novel in enumerate(all_novels):
                 # 進捗表示を更新（100冊ごと）
                 progress_step += 1
                 if progress_step % 100 == 0:
@@ -435,28 +443,77 @@ class UpdatePanel(ttk.Frame):
                     self.after(0, lambda msg=f"小説の欠落エピソードをチェック中... ({progress_step}/{total_novels})":
                     self.progress_label.config(text=msg))
 
-                ncode = novel[0]
+                # 小説コードの取得
+                logger.debug(f"小説 {i + 1}: {novel}")
+                if len(novel) < 1:
+                    logger.warning(f"不正な小説データ形式: {novel}")
+                    continue
 
-                # 更新除外フラグがある場合はスキップ
-                excluded = novel[8] if len(novel) > 8 else 0
+                ncode = novel[0]
+                logger.debug(f"処理中の小説コード: {ncode}")
+
+                # 更新除外フラグがある場合はスキップ（インデックスの範囲チェック）
+                excluded = None
+                try:
+                    if len(novel) > 8:
+                        excluded = novel[8]
+                        logger.debug(f"除外フラグ（生値）: {excluded}, 型: {type(excluded)}")
+                except IndexError:
+                    logger.warning(f"インデックスエラー - Novel: {novel}")
+                    excluded = 0
+
+                # 除外フラグの処理
+                try:
+                    if excluded is not None:
+                        excluded = int(excluded)
+                    else:
+                        excluded = 0
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"除外フラグの変換エラー: {e} - 値: {excluded}")
+                    excluded = 0
+
+                logger.debug(f"除外フラグ（変換後）: {excluded}")
                 if excluded == 1:
+                    logger.debug(f"小説 {ncode} は更新除外されています")
                     continue
 
                 # 欠落エピソードを検索
+                logger.debug(f"欠落エピソードの検索: {ncode}")
                 missing_episodes = self.update_manager.db_manager.find_missing_episodes(ncode)
+                logger.debug(f"欠落エピソード: {missing_episodes}")
 
                 if missing_episodes:
                     # 欠落エピソードがある場合は、既存の更新リストにない場合のみ追加
                     if not any(ncode == n[0] for n in self.shinchaku_novels):
+                        logger.debug(f"欠落エピソードがある小説を新たに追加: {ncode}")
                         # 小説の詳細情報を取得
                         full_novel = self.update_manager.novel_manager.get_novel(ncode)
+                        logger.debug(f"取得した小説詳細: {full_novel}")
+
                         if full_novel:
                             title = full_novel[1]
-                            author = full_novel[2] if len(full_novel) > 2 else ""
-                            current_ep = full_novel[5] if len(full_novel) > 5 and full_novel[5] is not None else 0
-                            total_ep = full_novel[6] if len(full_novel) > 6 and full_novel[6] is not None else 0
+                            # 安全にcurrent_epとtotal_epを取得
+                            current_ep = 0
+                            total_ep = 0
+
+                            try:
+                                if len(full_novel) > 5 and full_novel[5] is not None:
+                                    current_ep_raw = full_novel[5]
+                                    logger.debug(f"Current EP raw: {current_ep_raw}, type: {type(current_ep_raw)}")
+                                    current_ep = int(current_ep_raw)
+                            except (ValueError, TypeError) as e:
+                                logger.warning(f"小説 {ncode} の現在エピソード数の変換エラー: {e}")
+
+                            try:
+                                if len(full_novel) > 6 and full_novel[6] is not None:
+                                    total_ep_raw = full_novel[6]
+                                    logger.debug(f"Total EP raw: {total_ep_raw}, type: {type(total_ep_raw)}")
+                                    total_ep = int(total_ep_raw)
+                            except (ValueError, TypeError) as e:
+                                logger.warning(f"小説 {ncode} の総エピソード数の変換エラー: {e}")
+
+                            logger.debug(f"変換後のエピソード数: current_ep={current_ep}, total_ep={total_ep}")
                             rating = full_novel[4] if len(full_novel) > 4 else None
-                            sub_tag = full_novel[10] if len(full_novel) > 10 else ""
 
                             # 必要な情報を含むタプルを作成
                             novel_tuple = (
@@ -466,16 +523,20 @@ class UpdatePanel(ttk.Frame):
                                 total_ep,
                                 rating
                             )
+                            logger.debug(f"作成した小説タプル: {novel_tuple}")
                             # この小説には欠落エピソードがあることを記録
                             self.novels_with_missing_episodes.append(novel_tuple)
 
             # 欠落エピソードがある小説を通常の更新リストに追加
+            logger.debug(f"欠落エピソードがある小説の数: {len(self.novels_with_missing_episodes)}")
             for novel in self.novels_with_missing_episodes:
                 if not any(novel[0] == n[0] for n in self.shinchaku_novels):
+                    logger.debug(f"更新リストに追加: {novel}")
                     self.shinchaku_novels.append(novel)
 
             # クラス変数にも更新内容を保存
             UpdatePanel._shinchaku_novels = self.shinchaku_novels
+            logger.debug(f"最終的な更新リストの小説数: {len(self.shinchaku_novels)}")
 
             # 進捗表示を非表示
             self.after(0, lambda: self.progress_frame.pack_forget())
@@ -488,6 +549,8 @@ class UpdatePanel(ttk.Frame):
 
         except Exception as e:
             logger.error(f"新着小説データの読み込みエラー: {e}")
+            import traceback
+            logger.error(f"詳細エラー情報: {traceback.format_exc()}")
             # エラー表示
             self.after(0, lambda: self.show_error(f"新着小説の読み込みに失敗しました: {e}"))
             # 更新確認ボタンを有効化

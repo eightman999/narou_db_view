@@ -161,6 +161,11 @@ class UpdateManager:
         try:
             total = len(novels)
 
+            # デバッグ情報: 受け取った小説リストの構造を出力
+            logger.debug(f"update_novels called with {total} novels")
+            for i, novel in enumerate(novels):
+                logger.debug(f"Novel {i + 1}: Type={type(novel)}, Length={len(novel)}, Content={novel}")
+
             if total == 0:
                 if progress_queue:
                     progress_queue.put({
@@ -181,39 +186,81 @@ class UpdateManager:
                 })
 
             # 全体の進捗計算用
-            # 安全にint型に変換して計算
-            total_episodes_to_update = sum(
-                int(novel[3]) - int(novel[2]) for novel in novels
-                if novel[3] is not None and novel[2] is not None and int(novel[3]) > int(novel[2])
-            )
+            # 全体の進捗計算
+            logger.debug("進捗計算のためのエピソード情報")
+            total_episodes_to_update = 0
+            for i, novel in enumerate(novels):
+                logger.debug(f"Novel {i + 1} for progress calc: {novel}")
+                try:
+                    current_ep_raw = novel[2]
+                    total_ep_raw = novel[3]
+                    logger.debug(
+                        f"Raw values: current_ep={current_ep_raw}, total_ep={total_ep_raw}, types: {type(current_ep_raw)}, {type(total_ep_raw)}")
+
+                    current_ep = int(current_ep_raw) if current_ep_raw is not None else 0
+                    total_ep = int(total_ep_raw) if total_ep_raw is not None else 0
+
+                    logger.debug(f"Converted values: current_ep={current_ep}, total_ep={total_ep}")
+
+                    if total_ep > current_ep:
+                        episodes_delta = total_ep - current_ep
+                        total_episodes_to_update += episodes_delta
+                        logger.debug(f"Adding {episodes_delta} episodes to update count")
+                except (IndexError, ValueError, TypeError) as e:
+                    logger.error(f"Error calculating progress for novel {i + 1}: {e}")
+                    logger.error(f"Novel data: {novel}")
+                    continue
+
+            logger.debug(f"Total episodes to update: {total_episodes_to_update}")
             updated_episodes = 0
 
             # 現在の日時を取得（エピソード更新時に使用）
             current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
             for i, novel_data in enumerate(novels):
-                n_code, title, current_ep, total_ep, rating = novel_data
-
-                # 安全にint型に変換
-                current_ep_int = int(current_ep) if current_ep is not None else 0
-                total_ep_int = int(total_ep) if total_ep is not None else 0
-
-                novel_progress = (i / total) * 100
-
-                if progress_queue:
-                    progress_queue.put({
-                        'percent': int(novel_progress),
-                        'message': f"[{i + 1}/{total}] {title}(ID:{n_code}) の更新を開始します..."
-                    })
+                logger.debug(f"Processing novel {i + 1}/{total}: {novel_data}")
 
                 try:
+                    # インデックスエラーを避けるための処理
+                    if len(novel_data) < 5:
+                        logger.error(f"Novel data has insufficient elements: {novel_data}")
+                        continue
+
+                    n_code = novel_data[0]
+                    title = novel_data[1]
+                    current_ep_raw = novel_data[2]
+                    total_ep_raw = novel_data[3]
+                    rating = novel_data[4]
+
+                    logger.debug(f"Extracted values: n_code={n_code}, title={title}, "
+                                 f"current_ep_raw={current_ep_raw}, total_ep_raw={total_ep_raw}, "
+                                 f"rating={rating}")
+
+                    try:
+                        current_ep = int(current_ep_raw) if current_ep_raw is not None else 0
+                        total_ep = int(total_ep_raw) if total_ep_raw is not None else 0
+                        logger.debug(f"Converted episode numbers: current_ep={current_ep}, total_ep={total_ep}")
+                    except (ValueError, TypeError) as e:
+                        logger.error(f"Error converting episode numbers: {e}")
+                        logger.error(f"Raw values: current_ep={current_ep_raw}, total_ep={total_ep_raw}")
+                        continue
+
+                    novel_progress = (i / total) * 100
+
+                    if progress_queue:
+                        progress_queue.put({
+                            'percent': int(novel_progress),
+                            'message': f"[{i + 1}/{total}] {title}(ID:{n_code}) の更新を開始します..."
+                        })
+
                     # 不足しているエピソードを取得
-                    episode_count = total_ep_int - current_ep_int
+                    episode_count = total_ep - current_ep
+                    logger.debug(f"Episodes to fetch: {episode_count}")
 
                     # 更新があるかどうかのフラグ
                     has_update = False
 
-                    for j, ep_no in enumerate(range(current_ep_int + 1, total_ep_int + 1)):
+                    for j, ep_no in enumerate(range(current_ep + 1, total_ep + 1)):
                         # 個別の小説の進捗と全体の進捗を計算
                         episode_progress = j / episode_count if episode_count > 0 else 1
                         overall_progress = novel_progress + (episode_progress * (100 / total))
@@ -221,22 +268,27 @@ class UpdateManager:
                         if progress_queue:
                             progress_queue.put({
                                 'percent': int(overall_progress),
-                                'message': f"[{i + 1}/{total}] {title} - エピソード {ep_no}/{total_ep_int} を取得中..."
+                                'message': f"[{i + 1}/{total}] {title} - エピソード {ep_no}/{total_ep} を取得中..."
                             })
 
                         # エピソードを取得
+                        logger.debug(f"Fetching episode {ep_no} for novel {n_code}")
                         episode_content, episode_title = catch_up_episode(n_code, ep_no, rating)
 
                         # データベースに保存
                         if episode_content and episode_title:
                             # タイムスタンプ付きでエピソードを保存
+                            logger.debug(f"Saving episode {ep_no} with title: {episode_title}")
                             self.db_manager.insert_episode(n_code, ep_no, episode_content, episode_title, current_time)
                             has_update = True
+                        else:
+                            logger.warning(f"Failed to get content for episode {ep_no}")
 
                         updated_episodes += 1
 
                     # 更新があった場合、小説テーブルのupdate_atを更新
                     if has_update:
+                        logger.debug(f"Updating timestamp for novel {n_code}")
                         self.db_manager.execute_query(
                             "UPDATE novels_descs SET updated_at = ? WHERE n_code = ?",
                             (current_time, n_code)
@@ -257,10 +309,12 @@ class UpdateManager:
                     logger.info(f"小説 {n_code} ({title}) の更新が完了しました")
 
                 except Exception as e:
-                    logger.error(f"小説 {n_code} の更新中にエラーが発生しました: {e}")
+                    logger.error(
+                        f"小説 {novel_data[0] if len(novel_data) > 0 else 'unknown'} の更新中にエラーが発生しました: {e}")
+                    logger.error(f"Novel data: {novel_data}")
                     if progress_queue:
                         progress_queue.put({
-                            'message': f"[{i + 1}/{total}] {title} の更新中にエラーが発生しました: {e}"
+                            'message': f"[{i + 1}/{total}] 更新中にエラーが発生しました: {e}"
                         })
 
             if progress_queue:
@@ -271,6 +325,8 @@ class UpdateManager:
 
         except Exception as e:
             logger.error(f"複数小説の更新エラー: {e}")
+            import traceback
+            logger.error(f"詳細エラー情報: {traceback.format_exc()}")
             if progress_queue:
                 progress_queue.put({
                     'percent': 0,
