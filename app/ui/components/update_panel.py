@@ -560,6 +560,9 @@ class UpdatePanel(ttk.Frame):
         buttons_header.pack(side="right", padx=5)
 
         # 新着小説一覧を表示
+        # app/ui/components/update_panel.py の update_ui メソッド内の小説表示部分を修正
+
+        # 新着小説一覧を表示 (update_ui メソッド内のコード)
         for i, novel_data in enumerate(self.shinchaku_novels):
             n_code, title, current_ep, total_ep, rating = novel_data
 
@@ -569,6 +572,21 @@ class UpdatePanel(ttk.Frame):
 
             # 欠落エピソードがある小説かどうか確認
             is_missing = any(n_code == n[0] for n in self.novels_with_missing_episodes)
+
+            # 欠落エピソードリストを取得
+            missing_episodes = []
+            if is_missing:
+                missing_episodes = self.update_manager.db_manager.find_missing_episodes(n_code)
+
+            # 更新が必要なエピソード数
+            required_updates = 0
+
+            if is_missing and missing_episodes:
+                # 欠落エピソードがある場合
+                required_updates = len(missing_episodes)
+            else:
+                # 通常の新着更新
+                required_updates = total_ep - current_ep
 
             # チェックボックス用の変数を作成
             self.checkbox_vars[n_code] = tk.BooleanVar(value=False)
@@ -584,14 +602,19 @@ class UpdatePanel(ttk.Frame):
 
             # 現在の状態表示
             status_text = f"{current_ep}/{total_ep}話"
-            if is_missing:
-                status_text += " ※"
+
+            if is_missing and missing_episodes:
+                # 欠落エピソードがある場合は、欠落数を表示
+                status_text = f"{current_ep}/{total_ep}話 (欠落{len(missing_episodes)}話)"
+            elif current_ep < total_ep:
+                # 通常の更新がある場合
+                status_text = f"{current_ep}/{total_ep}話 (未取得{total_ep - current_ep}話)"
 
             status_label = tk.Label(
                 item_frame,
                 text=status_text,
                 bg="#F0F0F0",
-                width=10
+                width=20
             )
             status_label.pack(side="left", padx=5)
 
@@ -605,18 +628,21 @@ class UpdatePanel(ttk.Frame):
             )
             title_label.pack(side="left", padx=5, fill="x", expand=True)
 
-            # タイトルのクリックイベント
-            title_label.bind(
-                "<Button-1>",
-                lambda e, novel=novel_data: self.show_update_confirmation(novel)
-            )
+            # 更新ボタンのコマンドを状況に応じて変更
+            if is_missing and missing_episodes:
+                update_command = lambda ncode=n_code, t=title, r=rating,
+                                        m=missing_episodes: self.show_episode_selection_dialog(ncode, t, r, m)
+                button_text = "欠落更新"
+            else:
+                update_command = lambda novel=novel_data: self.show_update_confirmation(novel)
+                button_text = "更新"
 
             # 更新ボタン
             update_button = ttk.Button(
                 item_frame,
-                text="更新",
+                text=button_text,
                 width=8,
-                command=lambda novel=novel_data: self.show_update_confirmation(novel)
+                command=update_command
             )
             update_button.pack(side="right", padx=5)
 
@@ -634,14 +660,12 @@ class UpdatePanel(ttk.Frame):
                 item_frame.config(bg="#E8E8E8")
                 status_label.config(bg="#E8E8E8")
                 title_label.config(bg="#E8E8E8")
-                checkbox.config(style="Alt.TCheckbutton")  # カスタムスタイルを適用（あれば）
 
             # 欠落エピソードがある小説は背景色を変える
-            if is_missing:
+            if is_missing and missing_episodes:
                 item_frame.config(bg="#FFECEC")
                 status_label.config(bg="#FFECEC")
                 title_label.config(bg="#FFECEC")
-
         # 欠落エピソードの説明を追加
         if any(n_code == n[0] for n in self.shinchaku_novels for n_code in
                [n2[0] for n2 in self.novels_with_missing_episodes]):
@@ -898,6 +922,9 @@ class UpdatePanel(ttk.Frame):
         # バックグラウンドでチェック
         threading.Thread(target=self._check_missing_episodes_thread, args=(ncode,)).start()
 
+
+    # app/ui/components/update_panel.py の _check_missing_episodes_thread メソッドの修正版
+
     def _check_missing_episodes_thread(self, ncode):
         """欠落エピソード確認のスレッド処理"""
         try:
@@ -910,6 +937,7 @@ class UpdatePanel(ttk.Frame):
                 return
 
             title = novel[1]
+            rating = novel[4] if len(novel) > 4 else None
 
             # 欠落エピソードを検索
             missing_episodes = self.update_manager.db_manager.find_missing_episodes(ncode)
@@ -920,32 +948,8 @@ class UpdatePanel(ttk.Frame):
                 'message': f"欠落エピソード確認完了"
             })
 
-            # 検索結果を表示
-            def show_result():
-                if not missing_episodes:
-                    messagebox.showinfo("欠落エピソード確認", f"小説「{title}」に欠落エピソードはありません。")
-                else:
-                    # 欠落エピソードがある場合は詳細を表示
-                    result = f"小説「{title}」には以下の{len(missing_episodes)}個の欠落エピソードがあります:\n\n"
-
-                    # 欠落エピソードが多すぎる場合は一部だけ表示
-                    if len(missing_episodes) > 20:
-                        shown_episodes = missing_episodes[:20]
-                        result += ", ".join(map(str, shown_episodes))
-                        result += f"\n\n...他 {len(missing_episodes) - 20} 話"
-                    else:
-                        result += ", ".join(map(str, missing_episodes))
-
-                    result += "\n\n欠落エピソードを取得しますか？"
-
-                    # 確認ダイアログを表示
-                    confirm = messagebox.askyesno("欠落エピソード確認", result)
-                    if confirm:
-                        # 欠落エピソード取得処理を開始
-                        self.fetch_missing_episodes(ncode, novel)
-
-            # UIスレッドで結果表示
-            self.after(0, show_result)
+            # UIスレッドで結果表示と選択ダイアログを表示
+            self.after(0, lambda: self.show_episode_selection_dialog(ncode, title, rating, missing_episodes))
 
             # 進捗表示を非表示
             self.after(3000, lambda: self.progress_queue.put({'show': False}))
@@ -956,7 +960,6 @@ class UpdatePanel(ttk.Frame):
                 'message': f"エラー: {e}"
             })
             self.after(3000, lambda: self.progress_queue.put({'show': False}))
-
     def fetch_missing_episodes(self, ncode, novel):
         """
         欠落エピソードを取得する
@@ -1225,3 +1228,308 @@ class UpdatePanel(ttk.Frame):
 
         # 少し待ってから次の小説を再チェック
         self.after(1500, lambda: self.start_batch_rechecking(novels_to_check))
+
+
+    # app/core/update_manager.py に追加する新しいメソッド
+
+    def update_specific_episodes(self, ncode, episode_list, progress_queue=None, on_complete=None):
+        """
+        指定された小説の特定エピソードのみを更新
+
+        Args:
+            ncode (str): 小説コード
+            episode_list (list): 更新するエピソード番号のリスト
+            progress_queue (Queue, optional): 進捗状況を通知するキュー
+            on_complete (callable, optional): 完了時に呼び出すコールバック関数
+        """
+        try:
+            # この小説のデータを取得
+            novel = self.novel_manager.get_novel(ncode)
+            if not novel:
+                if progress_queue:
+                    progress_queue.put({
+                        'show': True,
+                        'percent': 0,
+                        'message': f"エラー: 小説 {ncode} が見つかりません"
+                    })
+
+                if on_complete:
+                    on_complete()
+                return
+
+            title = novel[1]
+            rating = novel[4] if len(novel) > 4 else None
+
+            # 指定されたエピソードが空の場合
+            if not episode_list:
+                if progress_queue:
+                    progress_queue.put({
+                        'show': True,
+                        'percent': 100,
+                        'message': f"小説 [{title}] に更新するエピソードはありません"
+                    })
+
+                if on_complete:
+                    on_complete()
+                return
+
+            total_episodes = len(episode_list)
+
+            if progress_queue:
+                progress_queue.put({
+                    'show': True,
+                    'percent': 0,
+                    'message': f"小説 [{title}] の {total_episodes} 話を更新します"
+                })
+
+            # 現在の日時を取得（エピソード更新時に使用）
+            current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+            # エピソードを取得して保存
+            for i, ep_no in enumerate(episode_list):
+                # 進捗率計算
+                progress_percent = int((i / total_episodes) * 100)
+
+                if progress_queue:
+                    progress_queue.put({
+                        'percent': progress_percent,
+                        'message': f"エピソード {i + 1}/{total_episodes} (No.{ep_no}) を取得中... ({progress_percent}%)"
+                    })
+
+                # エピソードを取得
+                episode_content, episode_title = catch_up_episode(ncode, ep_no, rating)
+
+                # データベースに保存
+                if episode_content and episode_title:
+                    self.db_manager.insert_episode(ncode, ep_no, episode_content, episode_title, current_time)
+                else:
+                    logger.warning(f"エピソード {ncode}-{ep_no} の取得に失敗しました")
+
+            # 総エピソード数を更新
+            self.db_manager.update_total_episodes(ncode)
+
+            # 小説テーブルのupdate_atを更新
+            self.db_manager.execute_query(
+                "UPDATE novels_descs SET updated_at = ? WHERE n_code = ?",
+                (current_time, ncode)
+            )
+
+            # 小説キャッシュをクリア
+            self.novel_manager.clear_cache(ncode)
+
+            if progress_queue:
+                progress_queue.put({
+                    'percent': 100,
+                    'message': f"小説 [{title}] の指定エピソード {total_episodes}話の更新が完了しました"
+                })
+
+            logger.info(f"小説 {ncode} の指定エピソード {total_episodes}話の更新が完了しました")
+
+        except Exception as e:
+            logger.error(f"指定エピソード更新エラー: {e}")
+            if progress_queue:
+                progress_queue.put({
+                    'percent': 0,
+                    'message': f"エラー: {e}"
+                })
+
+        finally:
+            # 更新情報を再チェック
+            self.check_shinchaku()
+
+            # 完了コールバックの呼び出し
+            if on_complete:
+                on_complete()
+
+
+    # app/ui/components/update_panel.py に追加する新しいメソッド
+
+    def show_episode_selection_dialog(self, ncode, title, rating, missing_episodes):
+        """
+        エピソード選択ダイアログを表示
+
+        Args:
+            ncode (str): 小説コード
+            title (str): 小説タイトル
+            rating (int): レーティング
+            missing_episodes (list): 欠落エピソードのリスト
+        """
+        if not missing_episodes:
+            messagebox.showinfo("情報", f"小説「{title}」に欠落エピソードはありません。")
+            return
+
+        # ダイアログウィンドウの作成
+        dialog = tk.Toplevel(self)
+        dialog.title(f"「{title}」欠落エピソード選択")
+        dialog.geometry("500x400")
+        dialog.transient(self)  # 親ウィンドウの上に表示
+        dialog.grab_set()  # モーダルダイアログにする
+
+        # ウィンドウの中央配置
+        dialog.update_idletasks()
+        width = dialog.winfo_width()
+        height = dialog.winfo_height()
+        x = (dialog.winfo_screenwidth() // 2) - (width // 2)
+        y = (dialog.winfo_screenheight() // 2) - (height // 2)
+        dialog.geometry(f"+{x}+{y}")
+
+        # 説明ラベル
+        info_frame = tk.Frame(dialog, bg="#F0F0F0")
+        info_frame.pack(fill="x", pady=10, padx=20)
+
+        info_label = tk.Label(
+            info_frame,
+            text=f"小説「{title}」には以下の{len(missing_episodes)}話の欠落エピソードがあります。\n"
+                 "更新するエピソードを選択してください。",
+            justify="left",
+            bg="#F0F0F0",
+            wraplength=460
+        )
+        info_label.pack(fill="x")
+
+        # 全選択チェックボックス
+        select_all_frame = tk.Frame(dialog, bg="#F0F0F0")
+        select_all_frame.pack(fill="x", pady=5, padx=20)
+
+        select_all_var = tk.BooleanVar(value=True)  # デフォルトで全選択
+
+        def toggle_all_selections():
+            is_selected = select_all_var.get()
+            for var in episode_vars:
+                var.set(is_selected)
+
+        select_all_checkbox = ttk.Checkbutton(
+            select_all_frame,
+            text="すべて選択/解除",
+            variable=select_all_var,
+            command=toggle_all_selections
+        )
+        select_all_checkbox.pack(side="left", padx=5)
+
+        # チェックボックスフレーム（スクロール可能）
+        canvas = tk.Canvas(dialog, bg="#F0F0F0")
+        scrollbar = ttk.Scrollbar(dialog, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side="left", fill="both", expand=True, padx=(20, 0), pady=10)
+        scrollbar.pack(side="right", fill="y", padx=(0, 20), pady=10)
+
+        # マウスホイールイベントの設定
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+        # エピソードごとのチェックボックスを作成
+        episode_vars = []
+        episode_checkboxes = []
+
+        # エピソード番号でソート
+        sorted_episodes = sorted(missing_episodes)
+
+        # 複数行に配置するための計算
+        columns = 5  # 1行あたりの列数
+
+        for i, ep_no in enumerate(sorted_episodes):
+            row = i // columns
+            col = i % columns
+
+            # 変数を作成
+            var = tk.BooleanVar(value=True)  # デフォルトで選択状態
+            episode_vars.append(var)
+
+            # チェックボックス
+            checkbox = ttk.Checkbutton(
+                scrollable_frame,
+                text=f"{ep_no}話",
+                variable=var,
+                width=10
+            )
+            checkbox.grid(row=row, column=col, sticky="w", padx=5, pady=2)
+            episode_checkboxes.append(checkbox)
+
+        # 更新・キャンセルボタン
+        button_frame = tk.Frame(dialog, bg="#F0F0F0")
+        button_frame.pack(fill="x", pady=10, padx=20)
+
+        def on_update():
+            # 選択されたエピソードを取得
+            selected_episodes = []
+            for i, var in enumerate(episode_vars):
+                if var.get():
+                    selected_episodes.append(sorted_episodes[i])
+
+            if not selected_episodes:
+                messagebox.showinfo("情報", "エピソードが選択されていません。")
+                return
+
+            # ダイアログを閉じる
+            dialog.destroy()
+
+            # 更新処理を開始
+            self.update_selected_episodes(ncode, title, rating, selected_episodes)
+
+        update_button = ttk.Button(
+            button_frame,
+            text=f"選択したエピソードを更新",
+            command=on_update
+        )
+        update_button.pack(side="left", padx=10)
+
+        cancel_button = ttk.Button(
+            button_frame,
+            text="キャンセル",
+            command=dialog.destroy
+        )
+        cancel_button.pack(side="right", padx=10)
+
+
+    def update_selected_episodes(self, ncode, title, rating, episode_list):
+        """
+        選択されたエピソードを更新
+
+        Args:
+            ncode (str): 小説コード
+            title (str): 小説タイトル
+            rating (int): レーティング
+            episode_list (list): 更新するエピソード番号のリスト
+        """
+        if not episode_list:
+            return
+
+        if self.update_in_progress:
+            messagebox.showinfo("情報", "既に更新処理が実行中です")
+            return
+
+        # 確認ダイアログ
+        confirm = messagebox.askyesno(
+            "確認",
+            f"小説「{title}」の選択された{len(episode_list)}話を更新します。\n続行しますか？"
+        )
+
+        if not confirm:
+            return
+
+        # 更新中フラグをセット
+        self.update_in_progress = True
+
+        # 進捗表示の初期化
+        self.progress_queue.put({
+            'show': True,
+            'percent': 0,
+            'message': f"選択されたエピソードの更新を開始します..."
+        })
+
+        # 更新処理を非同期で実行
+        threading.Thread(
+            target=self.update_manager.update_specific_episodes,
+            args=(ncode, episode_list, self.progress_queue, self.on_update_complete)
+        ).start()
