@@ -10,3 +10,4 @@ app/settings.ini
 app/settings.ini
 *.db-shm
 *.db-wal
+*.ini
