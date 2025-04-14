@@ -1,6 +1,8 @@
 import configparser
 import datetime
 import gzip
+import sqlite3
+
 import yaml
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -12,7 +14,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 import random
 
-from config import DOWNLOAD_DIR, YML_DIR
+from config import DOWNLOAD_DIR, YML_DIR, DATABASE_PATH
 from app.database.db_handler import DatabaseHandler
 from app.utils.logger_manager import get_logger
 
@@ -578,3 +580,144 @@ def del_yml():
         if filename.endswith('.yml'):
             os.remove(os.path.join(yml_dir, filename))
             logger.info(f"Deleted {filename}")
+
+
+def check_and_update_missing_general_all_no():
+    """
+    general_all_noが取得できなかった小説の存在確認と話数の取得を行います。
+
+    1. general_all_noがNULLまたは0の小説を取得
+    2. 各小説の存在確認と話数の取得を行う
+    3. 存在しない場合はrating=5に設定
+    4. 存在する場合はrating=4に設定し、general_all_noを更新
+    """
+    logger.info("general_all_noが不明な小説の確認を開始します")
+
+    # データベース接続
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+
+    try:
+        # general_all_noが取得できていない小説の一覧を取得
+        cursor.execute("""
+            SELECT n_code, rating 
+            FROM novels_descs 
+            WHERE general_all_no IS NULL OR general_all_no = 0
+        """)
+
+        novels = cursor.fetchall()
+        logger.info(f"{len(novels)}件の小説のgeneral_all_noが不明です")
+
+        for n_code, current_rating in novels:
+            logger.info(f"小説 {n_code} の存在確認を行います")
+
+            # 小説の存在確認
+            exists = False
+            max_episode = 0
+
+            # 一般小説URLと18禁小説URLの両方をチェック
+            normal_url = f"https://ncode.syosetu.com/{n_code}/"
+            r18_url = f"https://novel18.syosetu.com/{n_code}/"
+
+            # Chromeオプション設定
+            options = Options()
+            options.add_argument('--headless')
+            options.add_argument('--disable-gpu')
+            options.add_argument(f'user-agent={random.choice(USER_AGENTS)}')
+
+            driver = webdriver.Chrome(options=options)
+
+            # まず通常URLをチェック
+            driver.get(normal_url)
+
+            # エラーページかどうか確認
+            normal_exists = not ("エラーが発生しました" in driver.page_source or "エラー" in driver.page_source)
+
+            # 18禁URLをチェック
+            if not normal_exists:
+                driver.get(r18_url)
+
+                # 年齢認証ページが表示された場合
+                if "ageauth" in driver.current_url:
+                    try:
+                        enter_link = driver.find_element(By.LINK_TEXT, "Enter")
+                        enter_link.click()
+                    except:
+                        logger.error("年齢認証ページのEnterリンクが見つかりません")
+
+                # エラーページかどうか確認
+                r18_exists = not ("エラーが発生しました" in driver.page_source or "エラー" in driver.page_source)
+                exists = r18_exists
+
+                # 18禁小説の場合はratingを1に設定
+                if r18_exists:
+                    rating = 1
+            else:
+                # 通常小説の場合
+                exists = True
+                rating = 2
+
+            # 小説が存在する場合は話数を取得
+            if exists:
+                # 話数を調査（エラーが出るまでアクセス）
+                episode = 1
+                while True:
+                    try:
+                        if rating == 1:
+                            episode_url = f"{r18_url}{episode}/"
+                        else:
+                            episode_url = f"{normal_url}{episode}/"
+
+                        driver.get(episode_url)
+
+                        # エラーページかどうか確認
+                        if "エラーが発生しました" in driver.page_source or "エラー" in driver.page_source:
+                            # エラーが出たら一つ前が最大話数
+                            max_episode = episode - 1
+                            break
+
+                        # 次の話数へ
+                        episode += 1
+
+                        # 念のため最大1000話までとする
+                        if episode > 1000:
+                            max_episode = 1000
+                            logger.warning(f"小説 {n_code} は話数が1000を超えているため、調査を打ち切ります")
+                            break
+
+                    except Exception as e:
+                        logger.error(f"話数調査中にエラー: {e}")
+                        max_episode = episode - 1
+                        break
+
+                # データベースを更新
+                cursor.execute("""
+                    UPDATE novels_descs 
+                    SET rating = ?, general_all_no = ? 
+                    WHERE n_code = ?
+                """, (rating, max_episode, n_code))
+
+                logger.info(f"小説 {n_code} の情報を更新しました: rating={rating}, general_all_no={max_episode}")
+            else:
+                # 存在しない場合はrating=5に設定
+                cursor.execute("""
+                    UPDATE novels_descs 
+                    SET rating = 5
+                    WHERE n_code = ?
+                """, (n_code,))
+
+                logger.info(f"小説 {n_code} は存在しないため、rating=5に設定しました")
+
+            # ドライバーを閉じる
+            driver.quit()
+
+        # コミット
+        conn.commit()
+        logger.info("general_all_noの更新が完了しました")
+
+    except Exception as e:
+        logger.error(f"general_all_no更新処理中にエラーが発生しました: {e}")
+        conn.rollback()
+
+    finally:
+        conn.close()

@@ -10,7 +10,7 @@ from tkinter import ttk, messagebox
 import threading
 import queue
 
-from app.core.checker import del_yml, dell_dl, db_update
+from app.core.checker import del_yml, dell_dl, db_update, check_and_update_missing_general_all_no
 # モジュールのインポート
 from app.ui.components.novel_list import NovelListView
 from app.ui.components.episode_list import EpisodeListView
@@ -238,6 +238,9 @@ class NovelViewerApp:
             # データベース接続
             self.db_manager.connect()
 
+            # general_all_noが不明な小説の確認と更新
+            check_and_update_missing_general_all_no()
+
             # 小説データの読み込み
             self.novel_manager.load_novels()
 
@@ -258,7 +261,6 @@ class NovelViewerApp:
             logger.error(f"データベース初期化エラー: {e}")
             self.root.after(0,
                             lambda: messagebox.showerror("エラー", f"データベース初期化中にエラーが発生しました: {e}"))
-
     def update_progress(self):
         """進捗状況の表示を更新する"""
         if not self.update_progress_queue.empty():
