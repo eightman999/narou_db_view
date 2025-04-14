@@ -512,15 +512,35 @@ class UpdatePanel(ttk.Frame):
                 if missing_episodes:
                     # 欠落エピソードがある場合は、既存の更新リストにない場合のみ追加
                     if not any(ncode == n[0] for n in self.shinchaku_novels):
+                        logger.debug(f"欠落エピソードがある小説を新たに追加: {ncode}")
                         # 小説の詳細情報を取得
                         full_novel = self.update_manager.novel_manager.get_novel(ncode)
+                        logger.debug(f"取得した小説詳細: {full_novel}")
+
                         if full_novel:
                             title = full_novel[1]
-                            author = full_novel[2] if len(full_novel) > 2 else ""
-                            current_ep = full_novel[5] if len(full_novel) > 5 and full_novel[5] is not None else 0
-                            total_ep = full_novel[6] if len(full_novel) > 6 and full_novel[6] is not None else 0
+                            # 安全にcurrent_epとtotal_epを取得
+                            current_ep = 0
+                            total_ep = 0
+
+                            try:
+                                if len(full_novel) > 5 and full_novel[5] is not None:
+                                    current_ep_raw = full_novel[5]
+                                    logger.debug(f"Current EP raw: {current_ep_raw}, type: {type(current_ep_raw)}")
+                                    current_ep = int(current_ep_raw)
+                            except (ValueError, TypeError) as e:
+                                logger.warning(f"小説 {ncode} の現在エピソード数の変換エラー: {e}")
+
+                            try:
+                                if len(full_novel) > 6 and full_novel[6] is not None:
+                                    total_ep_raw = full_novel[6]
+                                    logger.debug(f"Total EP raw: {total_ep_raw}, type: {type(total_ep_raw)}")
+                                    total_ep = int(total_ep_raw)
+                            except (ValueError, TypeError) as e:
+                                logger.warning(f"小説 {ncode} の総エピソード数の変換エラー: {e}")
+
+                            logger.debug(f"変換後のエピソード数: current_ep={current_ep}, total_ep={total_ep}")
                             rating = full_novel[4] if len(full_novel) > 4 else None
-                            sub_tag = full_novel[10] if len(full_novel) > 10 else ""
 
                             # 必要な情報を含むタプルを作成
                             novel_tuple = (
@@ -530,6 +550,7 @@ class UpdatePanel(ttk.Frame):
                                 total_ep,
                                 rating
                             )
+                            logger.debug(f"作成した小説タプル: {novel_tuple}")
                             # この小説には欠落エピソードがあることを記録
                             self.novels_with_missing_episodes.append(novel_tuple)
 
