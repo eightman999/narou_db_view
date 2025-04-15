@@ -385,7 +385,7 @@ def ncode_title(n_code):
 
 def shinchaku_checker():
     """
-    新着小説をチェック
+    新着小説をチェック（ratingが5の小説は除外）
 
     Returns:
         tuple: (新着エピソード数, 新着小説リスト, 新着小説数)
@@ -399,14 +399,16 @@ def shinchaku_checker():
     needs_update = db.get_novels_needing_update()
 
     for n_code, title, total_ep, general_all_no, rating in needs_update:
+        # ratingが5の小説はスキップ（データベースクエリで除外済みだが念のため）
+        if rating == 5:
+            continue
+
         shinchaku_ep += (general_all_no - total_ep)
         shinchaku_novel_no += 1
         shinchaku_novel.append((n_code, title, total_ep, general_all_no, rating))
 
     logger.info(f"Shinchaku: {shinchaku_novel_no}件{shinchaku_ep}話")
     return shinchaku_ep, shinchaku_novel, shinchaku_novel_no
-
-
 def catch_up_episode(n_code, episode_no, rating):
     """
     指定されたエピソードを取得

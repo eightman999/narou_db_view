@@ -4,12 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="bad1a08a-9700-4753-8d26-2a6749864910" name="変更" comment="っっl">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/core/checker.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/core/checker.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/database/db_files/novel_status.db-shm" beforeDir="false" afterPath="$PROJECT_DIR$/app/database/db_files/novel_status.db-shm" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/database/db_files/novel_status.db-wal" beforeDir="false" afterPath="$PROJECT_DIR$/app/database/db_files/novel_status.db-wal" afterDir="false" />
-    </list>
+    <list default="true" id="bad1a08a-9700-4753-8d26-2a6749864910" name="変更" comment="っっl" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -266,6 +261,7 @@
       <workItem from="1744330310447" duration="3161000" />
       <workItem from="1744422475480" duration="16633000" />
       <workItem from="1744584580881" duration="8580000" />
+      <workItem from="1744673024014" duration="607000" />
     </task>
     <task id="LOCAL-00001" summary="っっl">
       <option name="closed" value="true" />

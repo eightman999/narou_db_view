@@ -32,14 +32,14 @@ class UpdateManager:
 
     def check_shinchaku(self):
         """
-        新着小説をチェック
+        新着小説をチェック（ratingが5の小説は除外）
 
         Returns:
             tuple: (新着エピソード数, 新着小説リスト, 新着小説数)
         """
         with self.lock:
             try:
-                # 更新が必要な小説を取得
+                # 更新が必要な小説を取得（ratingが5の小説は除外）
                 needs_update = self.db_manager.get_novels_needing_update()
 
                 self.shinchaku_ep = 0
@@ -47,6 +47,10 @@ class UpdateManager:
                 self.shinchaku_novels = []
 
                 for n_code, title, current_ep, general_all_no, rating in needs_update:
+                    # ratingが5の小説はスキップ
+                    if rating == 5:
+                        continue
+
                     # 安全にint型に変換
                     current_ep_int = int(current_ep) if current_ep is not None else 0
                     general_all_no_int = int(general_all_no) if general_all_no is not None else 0
