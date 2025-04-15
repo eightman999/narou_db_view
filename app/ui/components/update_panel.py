@@ -24,6 +24,11 @@ class UpdatePanel(ttk.Frame):
     _shinchaku_novels = []
     _last_check_time = None
 
+    """
+    UpdatePanelクラスの修正パッチ
+    """
+
+    # UpdatePanelクラスの__init__メソッドを修正
     def __init__(self, parent, update_manager, update_callback, on_complete_callback):
         """
         初期化
@@ -40,6 +45,9 @@ class UpdatePanel(ttk.Frame):
         self.update_callback = update_callback
         self.on_complete_callback = on_complete_callback
 
+        # update_managerからdb_managerを取得
+        self.db_manager = update_manager.db_manager
+
         # 状態管理
         self.shinchaku_novels = UpdatePanel._shinchaku_novels
         self.novels_with_missing_episodes = []  # 欠落エピソードがある小説のリスト
@@ -53,7 +61,7 @@ class UpdatePanel(ttk.Frame):
         self.total_pages = 0
 
         # 初回起動管理用の設定ファイルパス
-        self.config_file = os.path.join('config', 'app_state.json')
+        self.config_file = os.path.join('app', 'config', 'app_state.json')
         self.is_first_run = self.check_first_run()
 
         # 進捗状況管理
@@ -77,7 +85,142 @@ class UpdatePanel(ttk.Frame):
         # ページネーション用のコントロール
         self.prev_button = None  # 前ページボタン
         self.next_button = None  # 次ページボタン
-        self.page_label = None   # ページ表示ラベル
+        self.page_label = None  # ページ表示ラベル
+
+    # load_shinchaku_novelsメソッドを修正
+    def load_shinchaku_novels(self):
+        """新着小説データの読み込み（バックグラウンドスレッドで実行）"""
+        try:
+            # 更新確認ボタンを無効化
+            self.after(0, lambda: self.update_check_button.config(state="disabled"))
+
+            # 新着情報を取得
+            _, shinchaku_novels, _ = self.update_manager.check_shinchaku()
+            self.shinchaku_novels = shinchaku_novels
+
+            # クラス変数にも保存して永続化
+            UpdatePanel._shinchaku_novels = shinchaku_novels
+
+            # 更新確認時刻を記録
+            self.last_check_time = datetime.now()
+            UpdatePanel._last_check_time = self.last_check_time
+
+            # 最終確認時刻ラベルを更新
+            self.after(0, self.update_last_check_label)
+
+            # 欠落エピソードがある小説を検索
+            self.novels_with_missing_episodes = []
+
+            # 更新除外されていない全小説を取得
+            all_novels = self.update_manager.novel_manager.get_all_novels()
+
+            # 進捗状況を初期化
+            total_novels = len(all_novels)
+            progress_step = 0
+
+            # 進捗表示
+            self.after(0, lambda: self.progress_frame.pack(fill="x", pady=5, padx=10,
+                                                           after=self.scrollable_frame.winfo_children()[0]))
+            self.after(0, lambda: self.progress_label.config(text="小説の欠落エピソードをチェック中..."))
+            self.after(0, lambda: self.progress_bar.config(value=0))
+
+            for novel in all_novels:
+                # 進捗表示を更新（100冊ごと）
+                progress_step += 1
+                if progress_step % 100 == 0:
+                    progress_percent = int((progress_step / total_novels) * 100)
+                    # メインスレッドへのキューイング
+                    self.after(0, lambda p=progress_percent: self.progress_bar.config(value=p))
+                    self.after(0, lambda msg=f"小説の欠落エピソードをチェック中... ({progress_step}/{total_novels})":
+                    self.progress_label.config(text=msg))
+
+                ncode = novel[0]
+
+                # 更新除外フラグがある場合はスキップ
+                excluded = novel[8] if len(novel) > 8 else 0
+                if excluded == 1:
+                    continue
+
+                # 欠落エピソードを検索
+                missing_episodes = self.update_manager.db_manager.find_missing_episodes(ncode)
+
+                if missing_episodes:
+                    # 欠落エピソードがある場合は、既存の更新リストにない場合のみ追加
+                    if not any(ncode == n[0] for n in self.shinchaku_novels):
+                        logger.debug(f"欠落エピソードがある小説を新たに追加: {ncode}")
+                        # 小説の詳細情報を取得
+                        query = """
+                        SELECT n_code, title, total_ep, general_all_no, rating 
+                        FROM novels_descs 
+                        WHERE n_code = ?
+                        """
+                        full_novel = self.db_manager.execute_read_query(query, (ncode,), fetch_all=False)
+                        logger.debug(f"取得した小説詳細: {full_novel}")
+
+                        if full_novel:
+                            title = full_novel[1]
+                            # 安全にcurrent_epとtotal_epを取得
+                            current_ep = 0
+                            total_ep = 0
+
+                            try:
+                                if len(full_novel) > 5 and full_novel[5] is not None:
+                                    current_ep_raw = full_novel[5]
+                                    logger.debug(f"Current EP raw: {current_ep_raw}, type: {type(current_ep_raw)}")
+                                    current_ep = int(current_ep_raw)
+                            except (ValueError, TypeError) as e:
+                                logger.warning(f"小説 {ncode} の現在エピソード数の変換エラー: {e}")
+
+                            try:
+                                if len(full_novel) > 6 and full_novel[6] is not None:
+                                    total_ep_raw = full_novel[6]
+                                    logger.debug(f"Total EP raw: {total_ep_raw}, type: {type(total_ep_raw)}")
+                                    total_ep = int(total_ep_raw)
+                            except (ValueError, TypeError) as e:
+                                logger.warning(f"小説 {ncode} の総エピソード数の変換エラー: {e}")
+
+                            logger.debug(f"変換後のエピソード数: current_ep={current_ep}, total_ep={total_ep}")
+                            rating = full_novel[4] if len(full_novel) > 4 else None
+
+                            # 必要な情報を含むタプルを作成
+                            novel_tuple = (
+                                ncode,
+                                title,
+                                current_ep,
+                                total_ep,
+                                rating
+                            )
+                            logger.debug(f"作成した小説タプル: {novel_tuple}")
+                            # この小説には欠落エピソードがあることを記録
+                            self.novels_with_missing_episodes.append(novel_tuple)
+
+            # 欠落エピソードがある小説を通常の更新リストに追加
+            for novel in self.novels_with_missing_episodes:
+                if not any(novel[0] == n[0] for n in self.shinchaku_novels):
+                    self.shinchaku_novels.append(novel)
+
+            # クラス変数にも更新内容を保存
+            UpdatePanel._shinchaku_novels = self.shinchaku_novels
+
+            # 進捗表示を非表示
+            self.after(0, lambda: self.progress_frame.pack_forget())
+
+            # 更新確認ボタンを有効化
+            self.after(0, lambda: self.update_check_button.config(state="normal"))
+
+            # 総ページ数を計算
+            self.total_pages = (len(self.shinchaku_novels) + self.items_per_page - 1) // self.items_per_page
+
+            # UIの更新はメインスレッドで行う（0ページ目を表示）
+            self.after(0, lambda: self.load_page(0))
+
+        except Exception as e:
+            error_message = f"新着小説の読み込みに失敗しました: {str(e)}"
+            logger.error(f"新着小説データの読み込みエラー: {e}")
+            # エラー表示 - ラムダ関数内でローカル変数eを使わない
+            self.after(0, lambda msg=error_message: self.show_error(msg))
+            # 更新確認ボタンを有効化
+            self.after(0, lambda: self.update_check_button.config(state="normal"))
 
     def check_first_run(self):
         """
@@ -120,6 +263,76 @@ class UpdatePanel(ttk.Frame):
         except Exception as e:
             logger.error(f"設定ファイル保存エラー: {e}")
 
+    """
+    UpdatePanelクラスのcheck_progress_queueメソッドの修正パッチ
+    """
+
+    # check_progress_queueメソッドを修正
+    def check_progress_queue(self):
+        """進捗キューの確認とUI更新"""
+        try:
+            # キューからメッセージを取得（非ブロッキング）
+            while not self.progress_queue.empty():
+                progress_data = self.progress_queue.get_nowait()
+
+                # ウィジェットが存在するか確認
+                if not hasattr(self, 'progress_bar') or not self.progress_bar.winfo_exists():
+                    logger.debug("プログレスバーが存在しないため、進捗更新をスキップします")
+                    continue
+
+                # 進捗データの形式をチェック
+                if isinstance(progress_data, dict):
+                    # 進捗率の更新
+                    if 'percent' in progress_data:
+                        try:
+                            self.progress_bar['value'] = progress_data['percent']
+                        except Exception as e:
+                            logger.error(f"プログレスバーの更新中にエラーが発生しました: {e}")
+
+                    # メッセージの更新
+                    if 'message' in progress_data and hasattr(self,
+                                                              'progress_label') and self.progress_label.winfo_exists():
+                        try:
+                            self.progress_label.config(text=progress_data['message'])
+                        except Exception as e:
+                            logger.error(f"プログレスラベルの更新中にエラーが発生しました: {e}")
+
+                    # 進捗表示の表示/非表示
+                    if 'show' in progress_data and hasattr(self,
+                                                           'progress_frame') and self.progress_frame.winfo_exists():
+                        try:
+                            if progress_data['show']:
+                                # progress_frameが表示されていないことを確認してから表示
+                                if not self.progress_frame.winfo_ismapped():
+                                    if len(self.scrollable_frame.winfo_children()) > 0:
+                                        self.progress_frame.pack(fill="x", pady=5, padx=10,
+                                                                 after=self.scrollable_frame.winfo_children()[0])
+                                    else:
+                                        self.progress_frame.pack(fill="x", pady=5, padx=10)
+                            else:
+                                self.progress_frame.pack_forget()
+                        except Exception as e:
+                            logger.error(f"進捗フレームの表示/非表示中にエラーが発生しました: {e}")
+                else:
+                    # 文字列の場合はメッセージとして表示
+                    if hasattr(self, 'progress_label') and self.progress_label.winfo_exists():
+                        try:
+                            self.progress_label.config(text=str(progress_data))
+                        except Exception as e:
+                            logger.error(f"プログレスラベルの更新中にエラーが発生しました: {e}")
+
+                self.progress_queue.task_done()
+
+        except queue.Empty:
+            pass
+        except Exception as e:
+            logger.error(f"進捗キュー処理中に予期しないエラーが発生しました: {e}")
+
+        # 定期的にキューをチェック（100ミリ秒ごと）
+        if self.winfo_exists():  # ウィジェットが存在する場合のみスケジュール
+            self.after(100, self.check_progress_queue)
+
+    # init_uiメソッドの修正（プログレスフレームの初期化部分）
     def init_ui(self):
         """UIコンポーネントの初期化"""
         # 見出し
@@ -158,6 +371,27 @@ class UpdatePanel(ttk.Frame):
         # スクロールイベントを設定
         self.configure_scroll_event()
 
+        # 進捗表示フレーム - 先に初期化しておく
+        self.progress_frame = tk.Frame(self.scrollable_frame, bg="#F0F0F0")
+
+        # 進捗ラベル
+        self.progress_label = tk.Label(
+            self.progress_frame,
+            text="",
+            bg="#F0F0F0",
+            anchor="w"
+        )
+        self.progress_label.pack(fill="x", pady=(0, 5))
+
+        # 進捗バー
+        self.progress_bar = ttk.Progressbar(
+            self.progress_frame,
+            orient="horizontal",
+            mode="determinate",
+            length=100
+        )
+        self.progress_bar.pack(fill="x")
+
         # ボタンフレーム
         button_frame = tk.Frame(self.scrollable_frame, bg="#F0F0F0")
         button_frame.pack(fill="x", pady=10, padx=10)
@@ -186,31 +420,6 @@ class UpdatePanel(ttk.Frame):
             command=self.update_all_novels
         )
         update_all_button.pack(side="left", padx=5)
-
-        # 進捗表示フレーム
-        self.progress_frame = tk.Frame(self.scrollable_frame, bg="#F0F0F0")
-        self.progress_frame.pack(fill="x", pady=5, padx=10)
-
-        # 進捗ラベル
-        self.progress_label = tk.Label(
-            self.progress_frame,
-            text="",
-            bg="#F0F0F0",
-            anchor="w"
-        )
-        self.progress_label.pack(fill="x", pady=(0, 5))
-
-        # 進捗バー
-        self.progress_bar = ttk.Progressbar(
-            self.progress_frame,
-            orient="horizontal",
-            mode="determinate",
-            length=100
-        )
-        self.progress_bar.pack(fill="x")
-
-        # 初期状態では進捗表示を隠す
-        self.progress_frame.pack_forget()
 
         # 全選択フレーム
         select_all_frame = tk.Frame(self.scrollable_frame, bg="#F0F0F0")
@@ -260,6 +469,9 @@ class UpdatePanel(ttk.Frame):
         self.list_display_frame = tk.Frame(self.scrollable_frame, bg="#F0F0F0")
         self.list_display_frame.pack(fill="x", expand=True, padx=10)
 
+        # 初期状態では進捗表示を隠す
+        self.progress_frame.pack_forget()
+
         # 進捗更新タイマーを開始
         self.start_progress_update_timer()
 
@@ -308,41 +520,6 @@ class UpdatePanel(ttk.Frame):
     def start_progress_update_timer(self):
         """進捗更新タイマーを開始"""
         self.check_progress_queue()
-
-    def check_progress_queue(self):
-        """進捗キューの確認とUI更新"""
-        try:
-            # キューからメッセージを取得（非ブロッキング）
-            while not self.progress_queue.empty():
-                progress_data = self.progress_queue.get_nowait()
-
-                # 進捗データの形式をチェック
-                if isinstance(progress_data, dict):
-                    # 進捗率の更新
-                    if 'percent' in progress_data:
-                        self.progress_bar['value'] = progress_data['percent']
-
-                    # メッセージの更新
-                    if 'message' in progress_data:
-                        self.progress_label.config(text=progress_data['message'])
-
-                    # 進捗表示の表示/非表示
-                    if 'show' in progress_data:
-                        if progress_data['show']:
-                            self.progress_frame.pack(fill="x", pady=5, padx=10, after=self.scrollable_frame.winfo_children()[0])
-                        else:
-                            self.progress_frame.pack_forget()
-                else:
-                    # 文字列の場合はメッセージとして表示
-                    self.progress_label.config(text=str(progress_data))
-
-                self.progress_queue.task_done()
-
-        except queue.Empty:
-            pass
-
-        # 定期的にキューをチェック（100ミリ秒ごと）
-        self.after(100, self.check_progress_queue)
 
     def check_updates(self):
         """
@@ -454,137 +631,6 @@ class UpdatePanel(ttk.Frame):
         )
         loading_label.pack(pady=20)
 
-    def load_shinchaku_novels(self):
-        """新着小説データの読み込み（バックグラウンドスレッドで実行）"""
-        try:
-            # 更新確認ボタンを無効化
-            self.after(0, lambda: self.update_check_button.config(state="disabled"))
-
-            # 新着情報を取得
-            _, shinchaku_novels, _ = self.update_manager.check_shinchaku()
-            self.shinchaku_novels = shinchaku_novels
-
-            # クラス変数にも保存して永続化
-            UpdatePanel._shinchaku_novels = shinchaku_novels
-
-            # 更新確認時刻を記録
-            self.last_check_time = datetime.now()
-            UpdatePanel._last_check_time = self.last_check_time
-
-            # 最終確認時刻ラベルを更新
-            self.after(0, self.update_last_check_label)
-
-            # 欠落エピソードがある小説を検索
-            self.novels_with_missing_episodes = []
-
-            # 更新除外されていない全小説を取得
-            all_novels = self.update_manager.novel_manager.get_all_novels()
-
-            # 進捗状況を初期化
-            total_novels = len(all_novels)
-            progress_step = 0
-
-            # 進捗表示
-            self.after(0, lambda: self.progress_frame.pack(fill="x", pady=5, padx=10, after=self.scrollable_frame.winfo_children()[0]))
-            self.after(0, lambda: self.progress_label.config(text="小説の欠落エピソードをチェック中..."))
-            self.after(0, lambda: self.progress_bar.config(value=0))
-
-            for novel in all_novels:
-                # 進捗表示を更新（100冊ごと）
-                progress_step += 1
-                if progress_step % 100 == 0:
-                    progress_percent = int((progress_step / total_novels) * 100)
-                    # メインスレッドへのキューイング
-                    self.after(0, lambda p=progress_percent: self.progress_bar.config(value=p))
-                    self.after(0, lambda msg=f"小説の欠落エピソードをチェック中... ({progress_step}/{total_novels})":
-                    self.progress_label.config(text=msg))
-
-                ncode = novel[0]
-
-                # 更新除外フラグがある場合はスキップ
-                excluded = novel[8] if len(novel) > 8 else 0
-                if excluded == 1:
-                    continue
-
-                # 欠落エピソードを検索
-                missing_episodes = self.update_manager.db_manager.find_missing_episodes(ncode)
-
-                if missing_episodes:
-                    # 欠落エピソードがある場合は、既存の更新リストにない場合のみ追加
-                    if not any(ncode == n[0] for n in self.shinchaku_novels):
-                        logger.debug(f"欠落エピソードがある小説を新たに追加: {ncode}")
-                        # 小説の詳細情報を取得
-                        query = """
-                        SELECT n_code, title, total_ep, general_all_no, rating 
-                        FROM novels_descs 
-                        WHERE n_code = ?
-                        """
-                        full_novel = self.db_manager.execute_read_query(query, (ncode,), fetch_all=False)
-                        logger.debug(f"取得した小説詳細: {full_novel}")
-
-                        if full_novel:
-                            title = full_novel[1]
-                            # 安全にcurrent_epとtotal_epを取得
-                            current_ep = 0
-                            total_ep = 0
-
-                            try:
-                                if len(full_novel) > 5 and full_novel[5] is not None:
-                                    current_ep_raw = full_novel[5]
-                                    logger.debug(f"Current EP raw: {current_ep_raw}, type: {type(current_ep_raw)}")
-                                    current_ep = int(current_ep_raw)
-                            except (ValueError, TypeError) as e:
-                                logger.warning(f"小説 {ncode} の現在エピソード数の変換エラー: {e}")
-
-                            try:
-                                if len(full_novel) > 6 and full_novel[6] is not None:
-                                    total_ep_raw = full_novel[6]
-                                    logger.debug(f"Total EP raw: {total_ep_raw}, type: {type(total_ep_raw)}")
-                                    total_ep = int(total_ep_raw)
-                            except (ValueError, TypeError) as e:
-                                logger.warning(f"小説 {ncode} の総エピソード数の変換エラー: {e}")
-
-                            logger.debug(f"変換後のエピソード数: current_ep={current_ep}, total_ep={total_ep}")
-                            rating = full_novel[4] if len(full_novel) > 4 else None
-
-                            # 必要な情報を含むタプルを作成
-                            novel_tuple = (
-                                ncode,
-                                title,
-                                current_ep,
-                                total_ep,
-                                rating
-                            )
-                            logger.debug(f"作成した小説タプル: {novel_tuple}")
-                            # この小説には欠落エピソードがあることを記録
-                            self.novels_with_missing_episodes.append(novel_tuple)
-
-            # 欠落エピソードがある小説を通常の更新リストに追加
-            for novel in self.novels_with_missing_episodes:
-                if not any(novel[0] == n[0] for n in self.shinchaku_novels):
-                    self.shinchaku_novels.append(novel)
-
-            # クラス変数にも更新内容を保存
-            UpdatePanel._shinchaku_novels = self.shinchaku_novels
-
-            # 進捗表示を非表示
-            self.after(0, lambda: self.progress_frame.pack_forget())
-
-            # 更新確認ボタンを有効化
-            self.after(0, lambda: self.update_check_button.config(state="normal"))
-
-            # 総ページ数を計算
-            self.total_pages = (len(self.shinchaku_novels) + self.items_per_page - 1) // self.items_per_page
-
-            # UIの更新はメインスレッドで行う（0ページ目を表示）
-            self.after(0, lambda: self.load_page(0))
-
-        except Exception as e:
-            logger.error(f"新着小説データの読み込みエラー: {e}")
-            # エラー表示
-            self.after(0, lambda: self.show_error(f"新着小説の読み込みに失敗しました: {e}"))
-            # 更新確認ボタンを有効化
-            self.after(0, lambda: self.update_check_button.config(state="normal"))
 
     def load_page(self, page_num):
         """

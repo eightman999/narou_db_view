@@ -4,6 +4,7 @@ import os
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # データベース関連の設定
+
 DATABASE_DIR = os.path.join(ROOT_DIR, 'app','database', 'db_files')
 DATABASE_PATH = os.path.join(DATABASE_DIR, 'novel_status.db')
 
