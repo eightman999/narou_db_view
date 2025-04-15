@@ -1232,36 +1232,258 @@ class UpdatePanel(ttk.Frame):
             args=(novel_data,)
         ).start()
 
-    def update_all_novels(self):
-        """すべての新着小説を更新"""
-        if not self.shinchaku_novels:
-            messagebox.showinfo("情報", "更新が必要な小説はありません")
+    def update_all_novels(self, progress_queue=None, on_complete=None):
+        """
+        全ての更新可能な小説を更新（欠落エピソードも含む）
+
+        Args:
+            progress_queue: 進捗状況を通知するキュー
+            on_complete: 完了時に呼び出すコールバック関数
+        """
+        try:
+            # 更新が必要な小説を取得
+            needs_update = self.db_manager.get_novels_needing_update()
+
+            # 更新対象の小説がない場合
+            if not needs_update:
+                if progress_queue:
+                    progress_queue.put({
+                        'show': True,
+                        'percent': 100,
+                        'message': "更新が必要な小説がありません。"
+                    })
+
+                if on_complete:
+                    on_complete()
+                return
+
+            # 全小説の欠落エピソードをチェックして、対応するncodeのリストを作成
+            novels_with_missing = []
+            novel_count = len(needs_update)
+
+            if progress_queue:
+                progress_queue.put({
+                    'show': True,
+                    'percent': 0,
+                    'message': f"{novel_count}件の小説の欠落エピソードをチェック中..."
+                })
+
+            # 全小説の欠落エピソードを確認
+            for i, (ncode, title, _, _, _) in enumerate(needs_update):
+                # 進捗表示を更新
+                if progress_queue:
+                    check_progress = int((i / novel_count) * 20)  # 全体の20%をチェック処理に使用
+                    progress_queue.put({
+                        'percent': check_progress,
+                        'message': f"小説の欠落エピソードをチェック中... ({i + 1}/{novel_count})"
+                    })
+
+                # 欠落エピソードを確認
+                missing_episodes = self.db_manager.find_missing_episodes(ncode)
+                if missing_episodes and len(missing_episodes) > 0:
+                    novels_with_missing.append((ncode, title, missing_episodes))
+                    logger.info(f"小説 {ncode} ({title}) に {len(missing_episodes)} 個の欠落エピソードがあります")
+
+            # 欠落エピソードがある小説の情報を表示
+            if novels_with_missing:
+                if progress_queue:
+                    missing_message = f"{len(novels_with_missing)}冊の小説に欠落エピソードがあります。これらも合わせて更新します。"
+                    progress_queue.put({
+                        'percent': 20,
+                        'message': missing_message
+                    })
+                    logger.info(missing_message)
+
+            # 通常の更新処理を実行（進捗レンジを20%～60%に設定）
+            def on_normal_update_complete():
+                # 新着更新完了後に欠落エピソードの処理を開始
+                logger.info("通常更新が完了しました。欠落エピソードの更新を開始します。")
+                self._update_missing_episodes(novels_with_missing, progress_queue, on_complete)
+
+            # 新着更新の進捗計算用のカスタムキューを作成
+            normal_progress_queue = None
+            if progress_queue:
+                normal_progress_queue = self._create_progress_wrapper(progress_queue, 20, 60)
+
+            # 更新処理を実行（コールバックを変更して欠落更新に繋げる）
+            self.update_novels(needs_update, normal_progress_queue, on_normal_update_complete)
+
+        except Exception as e:
+            logger.error(f"全小説の更新エラー: {e}")
+            if progress_queue:
+                progress_queue.put({
+                    'percent': 0,
+                    'message': f"エラー: {e}"
+                })
+
+            # 完了コールバックの呼び出し
+            if on_complete:
+                on_complete()
+
+    def _update_missing_episodes(self, novels_with_missing, progress_queue=None, on_complete=None):
+        """
+        欠落エピソードのある小説を更新する内部メソッド
+
+        Args:
+            novels_with_missing: [(ncode, title, missing_episodes), ...] 形式のリスト
+            progress_queue: 進捗状況を通知するキュー
+            on_complete: 完了時に呼び出すコールバック関数
+        """
+        if not novels_with_missing:
+            logger.info("欠落エピソードのある小説はありません")
+            if progress_queue:
+                progress_queue.put({
+                    'percent': 100,
+                    'message': "全ての更新処理が完了しました。"
+                })
+
+            if on_complete:
+                on_complete()
             return
 
-        if self.update_in_progress:
-            messagebox.showinfo("情報", "既に更新処理が実行中です")
-            return
+        total_novels = len(novels_with_missing)
+        total_episodes = sum(len(episodes) for _, _, episodes in novels_with_missing)
 
-        # 更新確認ダイアログ
-        confirm = messagebox.askyesno(
-            "確認",
-            f"{len(self.shinchaku_novels)}件の小説を一括更新します。\nこの処理には時間がかかる場合があります。\n続行しますか？"
-        )
+        if progress_queue:
+            progress_queue.put({
+                'percent': 60,
+                'message': f"{total_novels}冊の小説から合計{total_episodes}話の欠落エピソードを更新します..."
+            })
 
-        if not confirm:
-            return
+        # 処理カウンタ
+        processed_novels = 0
+        processed_episodes = 0
 
-        # 更新処理を開始
-        self.update_in_progress = True
-        self.progress_queue.put({
-            'show': True,
-            'percent': 0,
-            'message': "すべての新着小説の更新を開始します..."
-        })
+        try:
+            # 各小説の欠落エピソードを処理
+            for ncode, title, missing_episodes in novels_with_missing:
+                # 小説情報を取得
+                novel = self.novel_manager.get_novel(ncode)
+                if not novel:
+                    logger.warning(f"小説 {ncode} ({title}) の情報が見つかりません")
+                    processed_novels += 1
+                    continue
 
-        # 更新を実行（コールバック経由）
-        if self.update_callback:
-            self.update_callback(self.shinchaku_novels)
+                rating = novel[4] if len(novel) > 4 else None
+
+                # 小説ごとの進捗メッセージ
+                if progress_queue:
+                    novel_progress = 60 + (processed_novels / total_novels) * 40
+                    progress_queue.put({
+                        'percent': int(novel_progress),
+                        'message': f"[{processed_novels + 1}/{total_novels}] {title} - {len(missing_episodes)}話の欠落エピソードを更新中..."
+                    })
+
+                # 現在の日時を取得（更新時のタイムスタンプとして使用）
+                current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+                # 各欠落エピソードを処理
+                for i, ep_no in enumerate(missing_episodes):
+                    episode_progress = i / len(missing_episodes)
+                    overall_progress = 60 + ((processed_novels + episode_progress) / total_novels) * 40
+
+                    if progress_queue:
+                        progress_queue.put({
+                            'percent': int(overall_progress),
+                            'message': f"[{processed_novels + 1}/{total_novels}] {title} - エピソード {ep_no} を取得中... ({i + 1}/{len(missing_episodes)})"
+                        })
+
+                    # エピソードを取得
+                    episode_content, episode_title = catch_up_episode(ncode, ep_no, rating)
+
+                    # データベースに保存
+                    if episode_content and episode_title:
+                        self.db_manager.insert_episode(ncode, ep_no, episode_content, episode_title, current_time)
+                        processed_episodes += 1
+                    else:
+                        logger.warning(f"エピソード {ncode}-{ep_no} の取得に失敗しました")
+
+                # 総エピソード数を更新
+                self.db_manager.update_total_episodes(ncode)
+
+                # 小説テーブルのupdate_atを更新
+                self.db_manager.execute_query(
+                    "UPDATE novels_descs SET updated_at = ? WHERE n_code = ?",
+                    (current_time, ncode)
+                )
+
+                # 小説キャッシュをクリア
+                self.novel_manager.clear_cache(ncode)
+
+                # 処理済みカウンタを増加
+                processed_novels += 1
+
+            # 処理完了メッセージ
+            if progress_queue:
+                progress_queue.put({
+                    'percent': 100,
+                    'message': f"全ての更新処理が完了しました。欠落エピソード {processed_episodes}話を更新しました。"
+                })
+
+            logger.info(
+                f"欠落エピソードの更新が完了しました。{processed_novels}冊の小説から{processed_episodes}話を更新しました。")
+
+        except Exception as e:
+            logger.error(f"欠落エピソード更新エラー: {e}")
+            if progress_queue:
+                progress_queue.put({
+                    'percent': 60,
+                    'message': f"欠落エピソード更新中にエラーが発生しました: {e}"
+                })
+
+        finally:
+            # 更新情報を再チェック
+            self.check_shinchaku()
+
+            # 完了コールバックの呼び出し
+            if on_complete:
+                on_complete()
+
+    def _create_progress_wrapper(self, original_queue, start_percent, end_percent):
+        """
+        進捗表示を指定した範囲に調整するためのラッパーキューを作成
+
+        Args:
+            original_queue: 元の進捗表示キュー
+            start_percent: 開始進捗率（全体に対する割合）
+            end_percent: 終了進捗率（全体に対する割合）
+
+        Returns:
+            Queue: ラッパーキュー
+        """
+        wrapper_queue = queue.Queue()
+
+        def process_queue():
+            while True:
+                try:
+                    # タイムアウト付きでキューからデータを取得
+                    progress_data = wrapper_queue.get(timeout=0.1)
+
+                    # 進捗率を調整
+                    if isinstance(progress_data, dict) and 'percent' in progress_data:
+                        original_percent = progress_data['percent']
+                        # 進捗率を指定範囲に変換
+                        adjusted_percent = start_percent + (original_percent / 100) * (end_percent - start_percent)
+                        progress_data['percent'] = int(adjusted_percent)
+
+                    # 元のキューに送信
+                    original_queue.put(progress_data)
+
+                    wrapper_queue.task_done()
+
+                except queue.Empty:
+                    # キューが空の場合は一定時間待機
+                    time.sleep(0.1)
+                    continue
+                except Exception as e:
+                    logger.error(f"進捗ラッパーエラー: {e}")
+                    continue
+
+        # キュー処理スレッドを開始
+        thread = threading.Thread(target=process_queue, daemon=True)
+        thread.start()
+
+        return wrapper_queue
 
     def check_missing_episodes(self, ncode):
         """
@@ -1287,41 +1509,7 @@ class UpdatePanel(ttk.Frame):
 
     # app/ui/components/update_panel.py の _check_missing_episodes_thread メソッドの修正版
 
-    def _check_missing_episodes_thread(self, ncode):
-        """欠落エピソード確認のスレッド処理"""
-        try:
-            # 小説情報を取得
-            novel = self.update_manager.novel_manager.get_novel(ncode)
-            if not novel:
-                self.progress_queue.put({
-                    'message': f"エラー: 小説が見つかりません"
-                })
-                return
 
-            title = novel[1]
-            rating = novel[4] if len(novel) > 4 else None
-
-            # 欠落エピソードを検索
-            missing_episodes = self.update_manager.db_manager.find_missing_episodes(ncode)
-
-            # 検索完了
-            self.progress_queue.put({
-                'percent': 100,
-                'message': f"欠落エピソード確認完了"
-            })
-
-            # UIスレッドで結果表示と選択ダイアログを表示
-            self.after(0, lambda: self.show_episode_selection_dialog(ncode, title, rating, missing_episodes))
-
-            # 進捗表示を非表示
-            self.after(3000, lambda: self.progress_queue.put({'show': False}))
-
-        except Exception as e:
-            logger.error(f"欠落エピソード確認エラー: {e}")
-            self.progress_queue.put({
-                'message': f"エラー: {e}"
-            })
-            self.after(3000, lambda: self.progress_queue.put({'show': False}))
 
     def fetch_missing_episodes(self, ncode, novel):
         """
