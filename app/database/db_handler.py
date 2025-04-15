@@ -547,7 +547,7 @@ class DatabaseHandler:
 
     def get_novels_needing_update(self):
         """
-        更新が必要な小説のリストを取得（効率化版）
+        更新が必要な小説のリストを取得（効率化版、ratingが5の小説は除外）
 
         Returns:
             list: 更新が必要な小説情報のリスト [(ncode, title, total_ep, general_all_no, rating), ...]
@@ -560,6 +560,7 @@ class DatabaseHandler:
         FROM novels_descs n
         WHERE n.general_all_no IS NOT NULL 
           AND (n.total_ep IS NULL OR n.total_ep < n.general_all_no)
+          AND n.rating != 5  -- ratingが5の小説を除外
         '''
         results = self.execute_read_query(query)
 

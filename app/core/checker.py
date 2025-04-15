@@ -1,6 +1,9 @@
+import concurrent
 import configparser
 import datetime
 import gzip
+import sqlite3
+
 import yaml
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -12,7 +15,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 import random
 
-from config import DOWNLOAD_DIR, YML_DIR
+from config import DOWNLOAD_DIR, YML_DIR, DATABASE_PATH
 from app.database.db_handler import DatabaseHandler
 from app.utils.logger_manager import get_logger
 
@@ -382,7 +385,7 @@ def ncode_title(n_code):
 
 def shinchaku_checker():
     """
-    新着小説をチェック
+    新着小説をチェック（ratingが5の小説は除外）
 
     Returns:
         tuple: (新着エピソード数, 新着小説リスト, 新着小説数)
@@ -396,14 +399,16 @@ def shinchaku_checker():
     needs_update = db.get_novels_needing_update()
 
     for n_code, title, total_ep, general_all_no, rating in needs_update:
+        # ratingが5の小説はスキップ（データベースクエリで除外済みだが念のため）
+        if rating == 5:
+            continue
+
         shinchaku_ep += (general_all_no - total_ep)
         shinchaku_novel_no += 1
         shinchaku_novel.append((n_code, title, total_ep, general_all_no, rating))
 
     logger.info(f"Shinchaku: {shinchaku_novel_no}件{shinchaku_ep}話")
     return shinchaku_ep, shinchaku_novel, shinchaku_novel_no
-
-
 def catch_up_episode(n_code, episode_no, rating):
     """
     指定されたエピソードを取得
@@ -578,3 +583,289 @@ def del_yml():
         if filename.endswith('.yml'):
             os.remove(os.path.join(yml_dir, filename))
             logger.info(f"Deleted {filename}")
+
+
+def check_and_update_missing_general_all_no(max_workers=10):
+    """
+    general_all_noが取得できなかった小説の存在確認と話数の取得を並列処理で行います。
+
+    Args:
+        max_workers (int): 同時に実行するスレッドの最大数
+    """
+    logger.info("general_all_noが不明な小説の並列確認を開始します")
+
+    # データベース接続
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+
+    try:
+        # general_all_noが取得できていない小説の一覧を取得
+        cursor.execute("""
+            SELECT n_code, rating 
+            FROM novels_descs 
+            WHERE general_all_no IS NULL OR general_all_no = 0
+        """)
+
+        novels = cursor.fetchall()
+        total_novels = len(novels)
+        logger.info(f"{total_novels}件の小説のgeneral_all_noが不明です")
+
+        if total_novels == 0:
+            logger.info("処理対象の小説がありません")
+            return
+
+        # 進捗表示用のカウンタと更新情報を保持するリスト
+        progress_count = 0
+        results = []
+
+        # 結果を保存するための関数
+        def process_novel_existence(novel_data):
+            nonlocal progress_count
+            n_code, current_rating = novel_data
+
+            try:
+                logger.info(f"小説 {n_code} の存在確認を行います")
+
+                # 小説の存在確認を行い、情報を取得
+                rating, exists, max_episode = check_novel_existence(n_code, current_rating)
+
+                # 処理カウンタを増加
+                progress_count += 1
+                logger.info(f"進捗: {progress_count}/{total_novels} - 小説 {n_code} の確認完了")
+
+                # 結果を返す
+                return n_code, rating, exists, max_episode
+            except Exception as e:
+                logger.error(f"小説 {n_code} の存在確認中にエラー: {e}")
+                progress_count += 1
+                return n_code, 5, False, 0  # エラー時はrating=5（存在しない）と仮定
+
+        # ThreadPoolExecutorを使用して並列処理
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # 各小説の処理を実行し、結果を集める
+            future_to_novel = {executor.submit(process_novel_existence, novel): novel for novel in novels}
+
+            for future in concurrent.futures.as_completed(future_to_novel):
+                novel = future_to_novel[future]
+                try:
+                    result = future.result()
+                    if result:
+                        results.append(result)
+                except Exception as e:
+                    logger.error(f"小説 {novel[0]} の処理中に例外が発生: {e}")
+
+        # 結果を一括でデータベースに更新（排他制御のため単一接続で実行）
+        for n_code, rating, exists, max_episode in results:
+            if exists:
+                cursor.execute("""
+                    UPDATE novels_descs 
+                    SET rating = ?, general_all_no = ? 
+                    WHERE n_code = ?
+                """, (rating, max_episode, n_code))
+                logger.info(f"小説 {n_code} の情報を更新しました: rating={rating}, general_all_no={max_episode}")
+            else:
+                cursor.execute("""
+                    UPDATE novels_descs 
+                    SET rating = 5
+                    WHERE n_code = ?
+                """, (n_code,))
+                logger.info(f"小説 {n_code} は存在しないため、rating=5に設定しました")
+
+        # コミット
+        conn.commit()
+        logger.info("general_all_noの並列更新が完了しました")
+
+    except Exception as e:
+        logger.error(f"general_all_no更新処理中にエラーが発生しました: {e}")
+        conn.rollback()
+
+    finally:
+        conn.close()
+
+def check_novel_existence(n_code, current_rating):
+    """
+    小説の存在確認と話数取得を行う関数
+
+    Args:
+        n_code (str): 小説コード
+        current_rating (int): 現在のレーティング
+
+    Returns:
+        tuple: (rating, exists, max_episode) - レーティング, 存在するか, 最大話数
+    """
+    # 小説の存在確認
+    exists = False
+    max_episode = 0
+    rating = current_rating
+
+    # 一般小説URLと18禁小説URLの両方をチェック
+    normal_url = f"https://ncode.syosetu.com/{n_code}/"
+    r18_url = f"https://novel18.syosetu.com/{n_code}/"
+
+    # Chromeオプション設定
+    options = Options()
+    options.add_argument('--headless')
+    options.add_argument('--disable-gpu')
+    options.add_argument(f'user-agent={random.choice(USER_AGENTS)}')
+
+    driver = webdriver.Chrome(options=options)
+
+    try:
+        # まず通常URLをチェック
+        driver.get(normal_url)
+
+        # エラーページかどうか確認（p-novelcom-header__pagetitleで判定）
+        try:
+            page_title = driver.find_element(By.CLASS_NAME, "p-novelcom-header__pagetitle")
+            normal_exists = page_title.text != "エラー"
+        except:
+            # 要素が見つからない場合はタイトル要素が存在するかどうかでチェック
+            normal_exists = len(driver.find_elements(By.CLASS_NAME, "novel_title")) > 0
+
+        # 18禁URLをチェック
+        if not normal_exists:
+            driver.get(r18_url)
+
+            # 年齢認証ページが表示された場合
+            if "ageauth" in driver.current_url:
+                try:
+                    enter_link = driver.find_element(By.LINK_TEXT, "Enter")
+                    enter_link.click()
+                except:
+                    logger.error(f"小説 {n_code}: 年齢認証ページのEnterリンクが見つかりません")
+
+            # エラーページかどうか確認（p-novelcom-header__pagetitleで判定）
+            try:
+                page_title = driver.find_element(By.CLASS_NAME, "p-novelcom-header__pagetitle")
+                r18_exists = page_title.text != "エラー"
+            except:
+                # 要素が見つからない場合はタイトル要素が存在するかどうかでチェック
+                r18_exists = len(driver.find_elements(By.CLASS_NAME, "novel_title")) > 0
+
+            exists = r18_exists
+
+            # 18禁小説の場合はratingを1に設定
+            if r18_exists:
+                rating = 1
+        else:
+            # 通常小説の場合
+            exists = True
+            rating = 2
+
+        # 小説が存在する場合は話数を取得
+        if exists:
+            # 話数を調査（エラーが出るまでアクセス）
+            episode = 1
+            while True:
+                try:
+                    if rating == 1:
+                        episode_url = f"{r18_url}{episode}/"
+                    else:
+                        episode_url = f"{normal_url}{episode}/"
+
+                    driver.get(episode_url)
+
+                    # エラーページかどうか確認（p-novelcom-header__pagetitleで判定）
+                    try:
+                        page_title = driver.find_element(By.CLASS_NAME, "p-novelcom-header__pagetitle")
+                        if page_title.text == "エラー":
+                            # エラーが出たら一つ前が最大話数
+                            max_episode = episode - 1
+                            break
+                    except:
+                        # 要素が見つからない場合は、本文要素が存在するかで判断
+                        if len(driver.find_elements(By.CLASS_NAME, "novel_view")) == 0:
+                            # 本文要素がない場合はエラーページと判断
+                            max_episode = episode - 1
+                            break
+
+                    # 次の話数へ
+                    episode += 1
+
+                    # 念のため最大5000話までとする
+                    if episode > 5000:
+                        max_episode = 5000
+                        logger.warning(f"小説 {n_code} は話数が5000を超えているため、調査を打ち切ります")
+                        break
+
+                except Exception as e:
+                    logger.error(f"小説 {n_code} の話数調査中にエラー: {e}")
+                    max_episode = episode - 1
+                    break
+
+    except Exception as e:
+        logger.error(f"小説 {n_code} の存在確認中にエラー: {e}")
+        # エラーの場合も、できるだけページタイトルを確認
+        try:
+            page_title = driver.find_element(By.CLASS_NAME, "p-novelcom-header__pagetitle")
+            if page_title.text == "エラー":
+                rating = 5
+                exists = False
+        except:
+            # この時点でエラーが出ている場合は、サイトにアクセスできなかった可能性が高い
+            # この場合は現在のレーティングを維持（変更しない）
+            exists = False
+
+    finally:
+        # ドライバーを閉じる
+        driver.quit()
+
+    return rating, exists, max_episode
+
+def batch_check_novel_existence(n_codes, max_workers=10):
+    """
+    複数の小説の存在確認を並列処理で行う
+
+    Args:
+        n_codes (list): 小説コードのリスト
+        max_workers (int): 同時に実行するスレッドの最大数
+
+    Returns:
+        dict: {n_code: (rating, exists, max_episode)} 形式の辞書
+    """
+    logger.info(f"{len(n_codes)}件の小説の存在確認を並列処理で開始します")
+    results = {}
+
+    # 進捗表示用のカウンタ
+    processed = 0
+    total = len(n_codes)
+
+    def check_single_novel(n_code):
+        nonlocal processed
+        try:
+            # 現在のレーティングを取得
+            current_rating = db.execute_read_query(
+                "SELECT rating FROM novels_descs WHERE n_code = ?",
+                (n_code,),
+                fetch_all=False
+            )
+            current_rating = current_rating[0] if current_rating else 0
+
+            # 存在確認を実行
+            result = check_novel_existence(n_code, current_rating)
+
+            # 進捗カウンタを更新
+            processed += 1
+            logger.info(f"進捗: {processed}/{total} - 小説 {n_code} の確認完了")
+
+            return n_code, result
+        except Exception as e:
+            logger.error(f"小説 {n_code} の処理中にエラー: {e}")
+            processed += 1
+            return n_code, (5, False, 0)  # エラー時はrating=5（存在しない）と仮定
+
+    # ThreadPoolExecutorを使用して並列処理
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # 各小説の処理を実行
+        future_to_ncode = {executor.submit(check_single_novel, n_code): n_code for n_code in n_codes}
+
+        for future in concurrent.futures.as_completed(future_to_ncode):
+            n_code = future_to_ncode[future]
+            try:
+                n_code, result = future.result()
+                results[n_code] = result
+            except Exception as e:
+                logger.error(f"小説 {n_code} の結果取得中にエラー: {e}")
+
+    logger.info(f"全{total}件の小説の存在確認が完了しました")
+    return results

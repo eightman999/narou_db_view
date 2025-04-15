@@ -32,14 +32,14 @@ class UpdateManager:
 
     def check_shinchaku(self):
         """
-        新着小説をチェック
+        新着小説をチェック（ratingが5の小説は除外）
 
         Returns:
             tuple: (新着エピソード数, 新着小説リスト, 新着小説数)
         """
         with self.lock:
             try:
-                # 更新が必要な小説を取得
+                # 更新が必要な小説を取得（ratingが5の小説は除外）
                 needs_update = self.db_manager.get_novels_needing_update()
 
                 self.shinchaku_ep = 0
@@ -47,11 +47,21 @@ class UpdateManager:
                 self.shinchaku_novels = []
 
                 for n_code, title, current_ep, general_all_no, rating in needs_update:
-                    # 安全にint型に変換
-                    current_ep_int = int(current_ep) if current_ep is not None else 0
-                    general_all_no_int = int(general_all_no) if general_all_no is not None else 0
+                    # ratingが5の小説はスキップ
+                    if rating == 5:
+                        continue
 
-                    self.shinchaku_ep += (general_all_no_int - current_ep_int)
+                    logger.debug(
+                        f"新着小説:N: {n_code} -T: {title} R:{rating} - CEP: {current_ep} - GAN: {general_all_no}")
+
+                    # 安全にint型に変換
+                    current_ep_int = self.safe_int_convert(current_ep)
+                    general_all_no_int = self.safe_int_convert(general_all_no)
+
+                    # 更新話数を計算して累積
+                    episodes_to_add = general_all_no_int - current_ep_int
+                    self.shinchaku_ep += episodes_to_add
+
                     self.shinchaku_count += 1
                     self.shinchaku_novels.append((n_code, title, current_ep_int, general_all_no_int, rating))
 
@@ -60,7 +70,28 @@ class UpdateManager:
 
             except Exception as e:
                 logger.error(f"新着チェックエラー: {e}")
+                import traceback
+                logger.error(f"詳細エラー情報: {traceback.format_exc()}")
                 return 0, [], 0
+
+    # 安全にint型に変換する関数を作る
+    def safe_int_convert(self, value, default=0):
+        """
+        安全に値を整数に変換する
+
+        Args:
+            value: 変換する値
+            default: 変換できない場合のデフォルト値
+
+        Returns:
+            int: 変換された整数値
+        """
+        if value is None or value == '':
+            return default
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return default
 
     def update_novel(self, novel, progress_queue=None, on_complete=None):
         """
