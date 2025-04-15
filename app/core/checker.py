@@ -714,8 +714,13 @@ def check_novel_existence(n_code, current_rating):
         # まず通常URLをチェック
         driver.get(normal_url)
 
-        # エラーページかどうか確認
-        normal_exists = not ("エラーが発生しました" in driver.page_source or "エラー" in driver.page_source)
+        # エラーページかどうか確認（p-novelcom-header__pagetitleで判定）
+        try:
+            page_title = driver.find_element(By.CLASS_NAME, "p-novelcom-header__pagetitle")
+            normal_exists = page_title.text != "エラー"
+        except:
+            # 要素が見つからない場合はタイトル要素が存在するかどうかでチェック
+            normal_exists = len(driver.find_elements(By.CLASS_NAME, "novel_title")) > 0
 
         # 18禁URLをチェック
         if not normal_exists:
@@ -729,8 +734,14 @@ def check_novel_existence(n_code, current_rating):
                 except:
                     logger.error(f"小説 {n_code}: 年齢認証ページのEnterリンクが見つかりません")
 
-            # エラーページかどうか確認
-            r18_exists = not ("エラーが発生しました" in driver.page_source or "エラー" in driver.page_source)
+            # エラーページかどうか確認（p-novelcom-header__pagetitleで判定）
+            try:
+                page_title = driver.find_element(By.CLASS_NAME, "p-novelcom-header__pagetitle")
+                r18_exists = page_title.text != "エラー"
+            except:
+                # 要素が見つからない場合はタイトル要素が存在するかどうかでチェック
+                r18_exists = len(driver.find_elements(By.CLASS_NAME, "novel_title")) > 0
+
             exists = r18_exists
 
             # 18禁小説の場合はratingを1に設定
@@ -754,19 +765,27 @@ def check_novel_existence(n_code, current_rating):
 
                     driver.get(episode_url)
 
-                    # エラーページかどうか確認
-                    if "エラーが発生しました" in driver.page_source or "エラー" in driver.page_source:
-                        # エラーが出たら一つ前が最大話数
-                        max_episode = episode - 1
-                        break
+                    # エラーページかどうか確認（p-novelcom-header__pagetitleで判定）
+                    try:
+                        page_title = driver.find_element(By.CLASS_NAME, "p-novelcom-header__pagetitle")
+                        if page_title.text == "エラー":
+                            # エラーが出たら一つ前が最大話数
+                            max_episode = episode - 1
+                            break
+                    except:
+                        # 要素が見つからない場合は、本文要素が存在するかで判断
+                        if len(driver.find_elements(By.CLASS_NAME, "novel_view")) == 0:
+                            # 本文要素がない場合はエラーページと判断
+                            max_episode = episode - 1
+                            break
 
                     # 次の話数へ
                     episode += 1
 
-                    # 念のため最大1000話までとする
+                    # 念のため最大5000話までとする
                     if episode > 5000:
                         max_episode = 5000
-                        logger.warning(f"小説 {n_code} は話数が1000を超えているため、調査を打ち切ります")
+                        logger.warning(f"小説 {n_code} は話数が5000を超えているため、調査を打ち切ります")
                         break
 
                 except Exception as e:
@@ -776,15 +795,22 @@ def check_novel_existence(n_code, current_rating):
 
     except Exception as e:
         logger.error(f"小説 {n_code} の存在確認中にエラー: {e}")
-        exists = False
-        rating = 5  # エラーの場合は存在しないものとして扱う
+        # エラーの場合も、できるだけページタイトルを確認
+        try:
+            page_title = driver.find_element(By.CLASS_NAME, "p-novelcom-header__pagetitle")
+            if page_title.text == "エラー":
+                rating = 5
+                exists = False
+        except:
+            # この時点でエラーが出ている場合は、サイトにアクセスできなかった可能性が高い
+            # この場合は現在のレーティングを維持（変更しない）
+            exists = False
 
     finally:
         # ドライバーを閉じる
         driver.quit()
 
     return rating, exists, max_episode
-
 
 def batch_check_novel_existence(n_codes, max_workers=10):
     """
