@@ -50,7 +50,7 @@ class UpdateManager:
                     # ratingが5の小説はスキップ
                     if rating == 5:
                         continue
-
+                    logger.debug(f"新着小説:N: {n_code} -T: {title} R:{rating} - CEP: {current_ep} - GAN: {general_all_no}")
                     # 安全にint型に変換
                     current_ep_int = self.safe_int_convert(current_ep)
                     general_all_no_int = self.safe_int_convert(general_all_no)

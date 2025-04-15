@@ -7,8 +7,9 @@
     <list default="true" id="bad1a08a-9700-4753-8d26-2a6749864910" name="変更" comment="っっl">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/core/update_manager.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/core/update_manager.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/database/db_files/novel_status.db-wal" beforeDir="false" afterPath="$PROJECT_DIR$/app/database/db_files/novel_status.db-wal" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/ui/components/update_panel.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/ui/components/update_panel.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/database/db_files/novel_status.db-shm" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/database/db_files/novel_status.db-wal" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/init/F_index.py" beforeDir="false" afterPath="$PROJECT_DIR$/init/F_index.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -266,7 +267,7 @@
       <workItem from="1744330310447" duration="3161000" />
       <workItem from="1744422475480" duration="16633000" />
       <workItem from="1744584580881" duration="8580000" />
-      <workItem from="1744673024014" duration="3346000" />
+      <workItem from="1744673024014" duration="4330000" />
     </task>
     <task id="LOCAL-00001" summary="っっl">
       <option name="closed" value="true" />
@@ -302,13 +303,13 @@
     <SUITE FILE_PATH="coverage/narou_db_view$episode_cleanup_script.coverage" NAME="episode_cleanup_script のカバレッジ結果" MODIFIED="1743909897534" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tools/data_cleanup" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$first_LR.coverage" NAME="first_LR のカバレッジ結果" MODIFIED="1740125068263" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$make_txt.coverage" NAME="make_txt のカバレッジ結果" MODIFIED="1740557097523" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/narou_db_view$F_index.coverage" NAME="F_index のカバレッジ結果" MODIFIED="1744448966185" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/init" />
+    <SUITE FILE_PATH="coverage/narou_db_view$F_index.coverage" NAME="F_index のカバレッジ結果" MODIFIED="1744713106178" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/init" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$remove_duplicates.coverage" NAME="remove_duplicates のカバレッジ結果" MODIFIED="1740471316135" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_view$Del_Duplication.coverage" NAME="Del_Duplication のカバレッジ結果" MODIFIED="1740914716409" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$delete_two_tag.coverage" NAME="delete_two_tag のカバレッジ結果" MODIFIED="1733821143452" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_view$first_formatter.coverage" NAME="first_formatter のカバレッジ結果" MODIFIED="1740914352973" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_view$main_view_async.coverage" NAME="main_view_async のカバレッジ結果" MODIFIED="1743684144726" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/narou_db_view$main__1_.coverage" NAME="main (1) のカバレッジ結果" MODIFIED="1744711826869" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/app" />
+    <SUITE FILE_PATH="coverage/narou_db_view$main__1_.coverage" NAME="main (1) のカバレッジ結果" MODIFIED="1744713338616" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/app" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$main_view.coverage" NAME="main_view のカバレッジ結果" MODIFIED="1740473074596" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_view$AsyncConnection.coverage" NAME="AsyncConnection のカバレッジ結果" MODIFIED="1743682582024" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$checker.coverage" NAME="checker のカバレッジ結果" MODIFIED="1740469049707" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />

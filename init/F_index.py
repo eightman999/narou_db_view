@@ -53,5 +53,36 @@ def add_update_check_indices():
     finally:
         conn.close()
 
+
+def cleanup_invalid_episode_counts():
+    """エピソード数フィールドの不正な値をクリーンアップする"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+
+    try:
+        # 不正なエピソード数を持つ小説を特定
+        cursor.execute("""
+            SELECT n_code, total_ep FROM novels_descs 
+            WHERE total_ep IS NOT NULL AND total_ep != '' AND CAST(total_ep AS INTEGER) != total_ep
+        """)
+
+        invalid_records = cursor.fetchall()
+
+        for n_code, total_ep in invalid_records:
+            # 正しいエピソード数を取得（例：エピソードテーブルから最大値を取得）
+            cursor.execute("SELECT MAX(CAST(episode_no AS INTEGER)) FROM episodes WHERE ncode = ?", (n_code,))
+            correct_count = cursor.fetchone()[0] or 0
+
+            # 修正
+            cursor.execute("UPDATE novels_descs SET total_ep = ? WHERE n_code = ?", (correct_count, n_code))
+
+        conn.commit()
+        print(f"{len(invalid_records)}件の不正なエピソード数を修正しました")
+
+    except Exception as e:
+        print(f"エラー: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
 if __name__ == "__main__":
-    add_update_check_indices()
+    cleanup_invalid_episode_counts()
