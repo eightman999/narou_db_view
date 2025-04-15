@@ -52,8 +52,8 @@ class UpdateManager:
                         continue
 
                     # 安全にint型に変換
-                    current_ep_int = int(current_ep) if current_ep is not None else 0
-                    general_all_no_int = int(general_all_no) if general_all_no is not None else 0
+                    current_ep_int = self.safe_int_convert(current_ep)
+                    general_all_no_int = self.safe_int_convert(general_all_no)
 
                     self.shinchaku_ep += (general_all_no_int - current_ep_int)
                     self.shinchaku_count += 1
@@ -66,6 +66,14 @@ class UpdateManager:
                 logger.error(f"新着チェックエラー: {e}")
                 return 0, [], 0
 
+    # 安全にint型に変換する関数を作る
+    def safe_int_convert(value, default=0):
+        if value is None or value == '':
+            return default
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return default
     def update_novel(self, novel, progress_queue=None, on_complete=None):
         """
         単一の小説を更新

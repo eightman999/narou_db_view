@@ -514,7 +514,12 @@ class UpdatePanel(ttk.Frame):
                     if not any(ncode == n[0] for n in self.shinchaku_novels):
                         logger.debug(f"欠落エピソードがある小説を新たに追加: {ncode}")
                         # 小説の詳細情報を取得
-                        full_novel = self.update_manager.novel_manager.get_novel(ncode)
+                        query = """
+                        SELECT n_code, title, total_ep, general_all_no, rating 
+                        FROM novels_descs 
+                        WHERE n_code = ?
+                        """
+                        full_novel = self.db_manager.execute_read_query(query, (ncode,), fetch_all=False)
                         logger.debug(f"取得した小説詳細: {full_novel}")
 
                         if full_novel:
