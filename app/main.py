@@ -516,8 +516,6 @@ def main():
     del_yml()
     dell_dl()
     db_update()
-    del_yml()
-    dell_dl()
     app = NovelViewerApp()
     app.run()
 
