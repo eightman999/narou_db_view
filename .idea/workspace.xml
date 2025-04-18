@@ -5,10 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="bad1a08a-9700-4753-8d26-2a6749864910" name="変更" comment="っっl">
+      <change afterPath="$PROJECT_DIR$/app/utils/exporters/export_gui.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/utils/exporters/export_novels.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/utils/exporters/html_exporter.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/database/db_files/novel_status.db-shm" beforeDir="false" afterPath="$PROJECT_DIR$/app/database/db_files/novel_status.db-shm" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/database/db_files/novel_status.db-wal" beforeDir="false" afterPath="$PROJECT_DIR$/app/database/db_files/novel_status.db-wal" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/ui/components/update_panel.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/ui/components/update_panel.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -66,6 +67,7 @@
     &quot;Python.episode_cleanup_script.executor&quot;: &quot;Run&quot;,
     &quot;Python.episode_count.executor&quot;: &quot;Run&quot;,
     &quot;Python.existence_checker.executor&quot;: &quot;Run&quot;,
+    &quot;Python.export_gui.executor&quot;: &quot;Run&quot;,
     &quot;Python.first_LR.executor&quot;: &quot;Run&quot;,
     &quot;Python.first_formatter.executor&quot;: &quot;Run&quot;,
     &quot;Python.first_last_update.executor&quot;: &quot;Run&quot;,
@@ -114,7 +116,7 @@
       <recent name="D:\趣味\narou_db_view\app\tools" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.main (1)">
+  <component name="RunManager" selected="Python.export_gui (1)">
     <configuration name="F_index" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="narou_db_formatter" />
       <option name="ENV_FILES" value="" />
@@ -161,7 +163,7 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="episode_cleanup_script" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+    <configuration name="export_gui (1)" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="narou_db_formatter" />
       <option name="ENV_FILES" value="" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -170,12 +172,35 @@
         <env name="PYTHONUNBUFFERED" value="1" />
       </envs>
       <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/tools/data_cleanup" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/app/export_tools" />
       <option name="IS_MODULE_SDK" value="true" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="D:\趣味\narou_db_view\app\tools\data_cleanup\episode_cleanup_script.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/app/export_tools/export_gui.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="export_gui" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="narou_db_formatter" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/app/utils/exporters" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/app/utils/exporters/export_gui.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -209,10 +234,11 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.export_gui (1)" />
+        <item itemvalue="Python.export_gui" />
         <item itemvalue="Python.main (1)" />
         <item itemvalue="Python.F_index" />
         <item itemvalue="Python.duplicates_remover" />
-        <item itemvalue="Python.episode_cleanup_script" />
       </list>
     </recent_temporary>
   </component>
@@ -270,7 +296,7 @@
       <workItem from="1744508777748" duration="101000" />
       <workItem from="1744524167318" duration="2381000" />
       <workItem from="1744717457085" duration="10104000" />
-      <workItem from="1744885341388" duration="9320000" />
+      <workItem from="1744885341388" duration="10289000" />
     </task>
     <task id="LOCAL-00001" summary="っっl">
       <option name="closed" value="true" />
@@ -329,6 +355,7 @@
     <SUITE FILE_PATH="coverage/narou_db_formatter$first_last_update.coverage" NAME="first_last_update のカバレッジ結果" MODIFIED="1740125062804" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$bookshelf.coverage" NAME="bookshelf のカバレッジ結果" MODIFIED="1734070551612" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$Del_Duplication.coverage" NAME="Del_Duplication のカバレッジ結果" MODIFIED="1740123519320" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/narou_db_view$export_gui.coverage" NAME="export_gui のカバレッジ結果" MODIFIED="1744980718433" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/app/utils/exporters" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$makeEPUB.coverage" NAME="makeEPUB のカバレッジ結果" MODIFIED="1734875569290" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$ep_no_fomatter.coverage" NAME="ep_no_fomatter のカバレッジ結果" MODIFIED="1733837104868" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$existence_checker.coverage" NAME="existence_checker のカバレッジ結果" MODIFIED="1740465795719" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
