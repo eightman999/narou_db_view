@@ -831,3 +831,35 @@ class HTMLExporter:
                 <input type="range" id="line-height-slider" class="line-height-slider" min="1.2" max="2.4" step="0.1" value="1.8">
             </div>
         </div>"""
+
+    def export_as_zip(self, zip_filename='novel_library.zip'):
+        """
+        エクスポートディレクトリをZIPにまとめる
+
+        Args:
+            zip_filename (str): 出力するZIPファイル名
+
+        Returns:
+            str: 作成したZIPファイルのパス
+        """
+        import zipfile
+
+        # PWA対応ファイルを作成
+        self.create_manifest_json()
+        self.create_service_worker()
+        self.create_readme()
+
+        # シンプルなアイコンを作成
+        self._create_simple_icons()
+
+        # ZIPファイルを作成
+        zip_path = Path(zip_filename)
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for root, _, files in os.walk(self.base_dir):
+                for file in files:
+                    file_path = Path(root) / file
+                    rel_path = file_path.relative_to(self.base_dir)
+                    zipf.write(file_path, str(rel_path))
+
+        logger.info(f"エクスポートデータをZIPにまとめました: {zip_path}")
+        return str(zip_path)
