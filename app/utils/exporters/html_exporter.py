@@ -374,17 +374,17 @@ class HTMLExporter:
                 if (contentElement) {
                     const increaseButton = document.getElementById('increase-font');
                     const decreaseButton = document.getElementById('decrease-font');
-
+                    
                     // 現在のフォントサイズを取得（デフォルトは16px）
                     let currentSize = localStorage.getItem('fontSize') || 16;
                     contentElement.style.fontSize = currentSize + 'px';
-
+                    
                     increaseButton.addEventListener('click', function() {
                         currentSize = Math.min(parseInt(currentSize) + 2, 32);
                         contentElement.style.fontSize = currentSize + 'px';
                         localStorage.setItem('fontSize', currentSize);
                     });
-
+                    
                     decreaseButton.addEventListener('click', function() {
                         currentSize = Math.max(parseInt(currentSize) - 2, 12);
                         contentElement.style.fontSize = currentSize + 'px';
@@ -392,15 +392,15 @@ class HTMLExporter:
                     });
                 }
             }
-
+            
             // 検索機能
             const searchBox = document.querySelector('.search-box');
             if (searchBox) {
                 const items = document.querySelectorAll('.novel-card, .episode-item');
-
+                
                 searchBox.addEventListener('input', function() {
                     const searchTerm = this.value.toLowerCase();
-
+                    
                     items.forEach(item => {
                         const text = item.textContent.toLowerCase();
                         if (text.includes(searchTerm)) {
@@ -411,7 +411,7 @@ class HTMLExporter:
                     });
                 });
             }
-
+            
             // TOPに戻るボタン
             const backToTopButton = document.querySelector('.back-to-top');
             if (backToTopButton) {
@@ -422,21 +422,21 @@ class HTMLExporter:
                         backToTopButton.classList.remove('visible');
                     }
                 });
-
+                
                 backToTopButton.addEventListener('click', function() {
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
             }
-
+            
             // 読書設定
             const settingsToggle = document.querySelector('.settings-toggle');
             if (settingsToggle) {
                 const readingSettings = document.querySelector('.reading-settings');
-
+                
                 settingsToggle.addEventListener('click', function() {
                     readingSettings.classList.toggle('open');
                 });
-
+                
                 // テーマ切替
                 const themeSelector = document.getElementById('theme-selector');
                 if (themeSelector) {
@@ -446,11 +446,11 @@ class HTMLExporter:
                         document.body.classList.add(savedTheme);
                         themeSelector.value = savedTheme;
                     }
-
+                    
                     themeSelector.addEventListener('change', function() {
                         // 既存のテーマクラスを削除
                         document.body.classList.remove('light-theme', 'dark-theme', 'sepia-theme');
-
+                        
                         if (this.value !== 'default') {
                             document.body.classList.add(this.value);
                             localStorage.setItem('theme', this.value);
@@ -459,7 +459,7 @@ class HTMLExporter:
                         }
                     });
                 }
-
+                
                 // フォント変更
                 const fontSelector = document.getElementById('font-selector');
                 if (fontSelector) {
@@ -469,7 +469,7 @@ class HTMLExporter:
                         document.body.style.fontFamily = savedFont;
                         fontSelector.value = savedFont;
                     }
-
+                    
                     fontSelector.addEventListener('change', function() {
                         if (this.value !== 'default') {
                             document.body.style.fontFamily = this.value;
@@ -480,7 +480,7 @@ class HTMLExporter:
                         }
                     });
                 }
-
+                
                 // 行間調整
                 const lineHeightSlider = document.getElementById('line-height-slider');
                 if (lineHeightSlider) {
@@ -492,7 +492,7 @@ class HTMLExporter:
                             contentElement.style.lineHeight = savedLineHeight;
                             lineHeightSlider.value = parseFloat(savedLineHeight);
                         }
-
+                        
                         lineHeightSlider.addEventListener('input', function() {
                             contentElement.style.lineHeight = this.value;
                             localStorage.setItem('lineHeight', this.value);
@@ -500,21 +500,21 @@ class HTMLExporter:
                     }
                 }
             }
-
+            
             // 進捗保存（最後に読んだ位置を保存）
             const episodeContent = document.querySelector('.episode-content');
             if (episodeContent) {
                 const novelId = document.body.getAttribute('data-novel-id');
                 const episodeId = document.body.getAttribute('data-episode-id');
-
+                
                 if (novelId && episodeId) {
                     const scrollKey = `scroll_${novelId}_${episodeId}`;
                     const savedPosition = localStorage.getItem(scrollKey);
-
+                    
                     if (savedPosition) {
                         window.scrollTo(0, parseInt(savedPosition));
                     }
-
+                    
                     window.addEventListener('scroll', function() {
                         localStorage.setItem(scrollKey, window.pageYOffset);
                     });
@@ -539,17 +539,21 @@ class HTMLExporter:
                 logger.warning("エクスポートする小説がありません")
                 return False
 
-            # インデックスページの作成
+            # インデックスページの作成（必ず実行）
+            logger.info("インデックスページを作成します...")
             self._create_index_page(novels)
 
             # 各小説のページを作成
+            logger.info(f"合計 {len(novels)} 作品をエクスポートします")
             for i, novel in enumerate(novels):
                 try:
                     ncode = novel[0]
-                    logger.info(f"小説のエクスポート中 ({i + 1}/{len(novels)}): {ncode}")
+                    logger.info(f"小説のエクスポート中 ({i+1}/{len(novels)}): {ncode}")
                     self.export_novel(ncode)
                 except Exception as e:
                     logger.error(f"小説 {ncode} のエクスポート中にエラーが発生しました: {e}")
+                    import traceback
+                    logger.error(traceback.format_exc())
 
             logger.info(f"全ての小説のエクスポートが完了しました。合計: {len(novels)}作品")
             return True
@@ -596,6 +600,7 @@ class HTMLExporter:
             self._create_novel_page(novel_dir, novel, episodes)
 
             # 各エピソードのページを作成
+            logger.info(f"小説 {ncode} のエピソード {len(episodes)}話を処理中...")
             for episode in episodes:
                 episode_no, title, body = episode
                 self._create_episode_page(novel_dir, novel, episode, episodes)
@@ -635,12 +640,12 @@ class HTMLExporter:
                     <h1>小説ライブラリ</h1>
                 </div>
             </header>
-
+            
             <main class="container">
                 <div class="search-container">
                     <input type="text" class="search-box" placeholder="小説を検索...">
                 </div>
-
+                
                 <div class="novel-list">
         """
 
@@ -669,9 +674,9 @@ class HTMLExporter:
         html_content += """
                 </div>
             </main>
-
+            
             <button class="back-to-top">↑</button>
-
+            
             <footer class="container">
                 <p>エクスポート日時: {0}</p>
             </footer>
@@ -727,10 +732,10 @@ class HTMLExporter:
                     <h1>{title}</h1>
                 </div>
             </header>
-
+            
             <main class="container">
                 <a href="../../index.html" class="back-link">← 小説一覧に戻る</a>
-
+                
                 <div class="novel-meta">
                     <h2>{title}</h2>
                     <p>作者: {author}</p>
@@ -739,17 +744,17 @@ class HTMLExporter:
                     <h3>あらすじ</h3>
                     <p>{synopsis}</p>
                 </div>
-
+                
                 <div class="search-container">
                     <input type="text" class="search-box" placeholder="エピソードを検索...">
                 </div>
-
+                
                 <h3>目次</h3>
                 <ul class="episode-list">
                     {episodes_html}
                 </ul>
             </main>
-
+            
             <button class="back-to-top">↑</button>
         </body>
         </html>
@@ -777,6 +782,27 @@ class HTMLExporter:
         author = novel[2] if novel[2] else "著者不明"
 
         episode_no, episode_title, episode_body = episode
+
+        # 本文の整形
+        processed_body = ""
+        if episode_body:
+            # HTML除去
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(episode_body, 'html.parser')
+            clean_text = soup.get_text()
+
+            # 段落ごとに分割して整形
+            paragraphs = clean_text.split('\n\n')
+            processed_paragraphs = []
+
+            for paragraph in paragraphs:
+                paragraph = paragraph.strip()
+                if paragraph:
+                    processed_paragraphs.append(f'<p>{paragraph}</p>')
+
+            processed_body = '\n'.join(processed_paragraphs)
+        else:
+            processed_body = "<p>本文がありません</p>"
 
         # 前後のエピソードへのリンクを準備
         sorted_episodes = sorted(all_episodes, key=lambda x: int(x[0]) if x[0].isdigit() else 0)
@@ -814,7 +840,7 @@ class HTMLExporter:
                     <option value="sepia-theme">セピア</option>
                 </select>
             </div>
-
+            
             <div class="settings-group">
                 <h3>フォント</h3>
                 <select id="font-selector" class="font-selector">
@@ -825,13 +851,213 @@ class HTMLExporter:
                     <option value="'Yu Gothic', sans-serif">游ゴシック</option>
                 </select>
             </div>
-
+            
             <div class="settings-group">
                 <h3>行間</h3>
                 <input type="range" id="line-height-slider" class="line-height-slider" min="1.2" max="2.4" step="0.1" value="1.8">
             </div>
         </div>"""
 
+        html_content = f"""
+        <!DOCTYPE html>
+        <html lang="ja">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>第{episode_no}話: {episode_title} - {novel_title}</title>
+            <link rel="stylesheet" href="../../assets/style.css">
+            <script src="../../assets/script.js" defer></script>
+        </head>
+        <body data-novel-id="{ncode}" data-episode-id="{episode_no}">
+            <header>
+                <div class="container">
+                    <h1>{novel_title}</h1>
+                    <h2>第{episode_no}話: {episode_title}</h2>
+                </div>
+            </header>
+            
+            <main class="container">
+                <a href="index.html" class="back-link">← 目次に戻る</a>
+                
+                <div class="episode-content">
+                    {processed_body}
+                </div>
+                
+                <div class="episode-nav">
+                    {prev_link}
+                    {next_link}
+                </div>
+            </main>
+            
+            {settings_panel}
+            
+            <div class="font-size-controls">
+                <button id="decrease-font" class="font-button">A-</button>
+                <button id="increase-font" class="font-button">A+</button>
+            </div>
+            
+            <button class="back-to-top">↑</button>
+        </body>
+        </html>
+        """
+
+        # ファイルに書き込み
+        episode_path = novel_dir / f'episode_{episode_no}.html'
+        with open(episode_path, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+
+        logger.info(f"エピソードページを作成しました: {episode_path}")
+
+    def _create_simple_icons(self):
+        """シンプルなアイコンを生成する（PWA用）"""
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+
+            # 背景色
+            bg_color = (74, 74, 74)  # ヘッダーと同じグレー
+            text_color = (255, 255, 255)  # 白
+
+            # 192x192サイズのアイコン
+            img_192 = Image.new('RGB', (192, 192), bg_color)
+            draw_192 = ImageDraw.Draw(img_192)
+
+            # テキスト描画（フォントがなければ中央に円を描画）
+            try:
+                font = ImageFont.truetype("Arial", 80)
+                draw_192.text((96, 96), "小", fill=text_color, font=font, anchor="mm")
+            except:
+                draw_192.ellipse((48, 48, 144, 144), fill=text_color)
+
+            # 512x512サイズのアイコン
+            img_512 = Image.new('RGB', (512, 512), bg_color)
+            draw_512 = ImageDraw.Draw(img_512)
+
+            try:
+                font = ImageFont.truetype("Arial", 200)
+                draw_512.text((256, 256), "小", fill=text_color, font=font, anchor="mm")
+            except:
+                draw_512.ellipse((128, 128, 384, 384), fill=text_color)
+
+            # 保存
+            img_192.save(self.assets_dir / 'icon-192.png')
+            img_512.save(self.assets_dir / 'icon-512.png')
+
+            logger.info("アイコンファイルを作成しました")
+
+        except Exception as e:
+            logger.warning(f"アイコン生成に失敗しました（PWAアイコンが表示されない可能性があります）: {e}")
+            # PILがない場合のフォールバック: 何もしない
+
+    def create_manifest_json(self):
+        """PWA用のmanifest.jsonファイルを作成する"""
+        manifest = {
+            "name": "小説ライブラリ",
+            "short_name": "小説App",
+            "description": "オフラインで読める小説ライブラリ",
+            "start_url": "./index.html",
+            "display": "standalone",
+            "background_color": "#ffffff",
+            "theme_color": "#4a4a4a",
+            "icons": [
+                {
+                    "src": "assets/icon-192.png",
+                    "sizes": "192x192",
+                    "type": "image/png"
+                },
+                {
+                    "src": "assets/icon-512.png",
+                    "sizes": "512x512",
+                    "type": "image/png"
+                }
+            ]
+        }
+
+        manifest_path = self.base_dir / 'manifest.json'
+        with open(manifest_path, 'w', encoding='utf-8') as f:
+            json.dump(manifest, f, ensure_ascii=False, indent=2)
+
+        logger.info(f"manifest.jsonを作成しました: {manifest_path}")
+
+    def create_service_worker(self):
+        """PWA用のService Workerファイルを作成する"""
+        sw_content = """
+        // Service Worker for 小説ライブラリ
+        const CACHE_NAME = 'novel-library-cache-v1';
+        
+        // キャッシュするリソースのリスト
+        const urlsToCache = [
+            './',
+            './index.html',
+            './assets/style.css',
+            './assets/script.js',
+            './manifest.json'
+        ];
+        
+        // Service Workerのインストール時
+        self.addEventListener('install', event => {
+            event.waitUntil(
+                caches.open(CACHE_NAME)
+                    .then(cache => {
+                        console.log('キャッシュをオープンしました');
+                        return cache.addAll(urlsToCache);
+                    })
+            );
+        });
+        
+        // ネットワークリクエスト時
+        self.addEventListener('fetch', event => {
+            event.respondWith(
+                caches.match(event.request)
+                    .then(response => {
+                        // キャッシュにあればそれを返す
+                        if (response) {
+                            return response;
+                        }
+                        
+                        // キャッシュになければネットワークから取得
+                        return fetch(event.request)
+                            .then(networkResponse => {
+                                // レスポンスが有効なら、キャッシュに追加
+                                if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+                                    return networkResponse;
+                                }
+                                
+                                const responseToCache = networkResponse.clone();
+                                
+                                caches.open(CACHE_NAME)
+                                    .then(cache => {
+                                        cache.put(event.request, responseToCache);
+                                    });
+                                
+                                return networkResponse;
+                            });
+                    })
+            );
+        });
+        
+        // 古いキャッシュの削除
+        self.addEventListener('activate', event => {
+            const cacheWhitelist = [CACHE_NAME];
+            
+            event.waitUntil(
+                caches.keys().then(cacheNames => {
+                    return Promise.all(
+                        cacheNames.map(cacheName => {
+                            if (cacheWhitelist.indexOf(cacheName) === -1) {
+                                return caches.delete(cacheName);
+                            }
+                        })
+                    );
+                })
+            );
+        });
+        """
+
+        sw_path = self.base_dir / 'service-worker.js'
+        with open(sw_path, 'w', encoding='utf-8') as f:
+            f.write(sw_content)
+
+        logger.info(f"Service Workerを作成しました: {sw_path}")
     def export_as_zip(self, zip_filename='novel_library.zip'):
         """
         エクスポートディレクトリをZIPにまとめる
@@ -863,3 +1089,106 @@ class HTMLExporter:
 
         logger.info(f"エクスポートデータをZIPにまとめました: {zip_path}")
         return str(zip_path)
+    def create_readme(self):
+        """使い方などを説明したREADMEファイルを作成する"""
+        readme_content = """
+        # 小説ライブラリ - 使い方
+
+        ## 概要
+        このHTMLエクスポートは、データベースに保存された小説データをオフラインで読めるようにHTMLに変換したものです。
+        Android端末のブラウザで開くことで、小説を快適に読むことができます。
+
+        ## 使い方
+
+        ### インストール方法
+        1. このフォルダ全体をAndroid端末に転送します
+        2. ブラウザで「index.html」を開きます
+        3. PWA対応ブラウザ（ChromeやEdgeなど）であれば、「ホーム画面に追加」からアプリのように使用できます
+
+        ### 機能
+        - 小説一覧：トップページから全小説が閲覧できます
+        - 検索機能：タイトルや作者名で検索できます
+        - 読書設定：フォント、テーマ、行間などを調整できます
+        - 自動スクロール位置保存：前回読んでいた位置を自動的に記憶します
+        - ダークモード対応：システムの設定に応じて自動的に切り替わります
+
+        ### 注意事項
+        - このエクスポートデータは定期的に更新する必要があります
+        - 画像などのリッチコンテンツには対応していません
+
+        ## 更新履歴
+        - 初回エクスポート日時: {0}
+        """
+
+        now = datetime.datetime.now().strftime('%Y年%m月%d日 %H:%M:%S')
+        readme_path = self.base_dir / 'README.txt'
+        with open(readme_path, 'w', encoding='utf-8') as f:
+            f.write(readme_content.format(now))
+
+        logger.info(f"READMEファイルを作成しました: {readme_path}")
+
+
+def run_export(export_dir='html_export', create_zip=True):
+    """
+    エクスポート処理を実行する単独関数
+
+    Args:
+        export_dir (str): エクスポート先ディレクトリ
+        create_zip (bool): ZIPファイルを作成するかどうか
+
+    Returns:
+        bool: 成功したかどうか
+    """
+    try:
+        # エクスポーターの初期化
+        exporter = HTMLExporter(export_dir)
+
+        # 全小説をエクスポート
+        result = exporter.export_all_novels()
+
+        if result and create_zip:
+            # ZIPファイルにまとめる
+            zip_path = exporter.export_as_zip()
+            print(f"エクスポートが完了しました。ZIPファイル: {zip_path}")
+        elif result:
+            print(f"エクスポートが完了しました。ディレクトリ: {export_dir}")
+        else:
+            print("エクスポートに失敗しました。ログを確認してください。")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"エクスポート処理中にエラーが発生しました: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        print(f"エラー: {e}")
+        return False
+
+
+# コマンドラインから直接実行された場合
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description='小説データをHTML形式にエクスポートします')
+    parser.add_argument('--dir', default='html_export', help='エクスポート先ディレクトリ')
+    parser.add_argument('--no-zip', action='store_true', help='ZIPファイルを作成しない')
+    parser.add_argument('--ncode', help='特定の小説だけをエクスポート')
+
+    args = parser.parse_args()
+
+    if args.ncode:
+        # 特定の小説のみエクスポート
+        exporter = HTMLExporter(args.dir)
+        result = exporter.export_novel(args.ncode)
+
+        if result:
+            print(f"小説 {args.ncode} のエクスポートが完了しました")
+
+            if not args.no_zip:
+                zip_path = exporter.export_as_zip(f"{args.ncode}_export.zip")
+                print(f"ZIPファイルを作成しました: {zip_path}")
+        else:
+            print(f"小説 {args.ncode} のエクスポートに失敗しました")
+    else:
+        # 全小説をエクスポート
+        run_export(args.dir, not args.no_zip)
