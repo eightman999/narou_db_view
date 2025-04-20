@@ -417,6 +417,7 @@ self.addEventListener('activate', event => {{
             logger.error(traceback.format_exc())
             return False
 
+    # HTMLExporterクラスの_create_index_pageメソッドを修正
     def _create_index_page(self, novels):
         """
         インデックスページを作成
@@ -444,12 +445,12 @@ self.addEventListener('activate', event => {{
                     <h1>小説ライブラリ</h1>
                 </div>
             </header>
-            
+
             <main class="container">
                 <div class="search-container">
                     <input type="text" class="search-box" placeholder="小説を検索...">
                 </div>
-                
+
                 <div class="novel-list">
         """
 
@@ -458,9 +459,9 @@ self.addEventListener('activate', event => {{
             ncode = novel[0]
             title = novel[1] if novel[1] else "無題の小説"
             author = novel[2] if novel[2] else "著者不明"
-            updated_at = novel[3] if novel[3] else "更新日不明"
+            synopsis = novel[3] if novel[3] else "更新日不明"
             episodes = novel[5] if len(novel) > 5 and novel[5] is not None else 0
-            synopsis = novel[7] if len(novel) > 7 and novel[7] else "あらすじはありません"
+            updated_at = novel[7] if len(novel) > 7 and novel[7] else "あらすじはありません"
 
             # あらすじの短縮
             if len(synopsis) > 150:
@@ -478,9 +479,9 @@ self.addEventListener('activate', event => {{
         html_content += f"""
                 </div>
             </main>
-            
+
             <button class="back-to-top">↑</button>
-            
+
             <footer class="container">
                 <p>エクスポート日時: {now}</p>
             </footer>
@@ -522,8 +523,8 @@ self.addEventListener('activate', event => {{
         ncode = novel[0]
         title = novel[1] if novel[1] else "無題の小説"
         author = novel[2] if novel[2] else "著者不明"
-        updated_at = novel[3] if novel[3] else "更新日不明"
-        synopsis = novel[7] if len(novel) > 7 and novel[7] else "あらすじはありません"
+        synopsis = novel[3] if novel[3] else "あらすじはありません"
+        updated_at = novel[7] if len(novel) > 7 and novel[7] else "更新日不明"
 
         # 目次を作成
         episodes_html = ""

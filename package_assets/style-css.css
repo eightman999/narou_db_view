@@ -18,6 +18,7 @@
     --episode-hover: #f0f0f0;      /* エピソードホバー時背景色 */
     --episode-border: #eaeaea;     /* エピソード境界線色 */
     --font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; /* 基本フォント */
+    --button-hover-bg: #3a3a3a;    /* ボタンホバー時背景色 */
 }
 
 /* ダークモード対応 */
@@ -33,6 +34,7 @@
         --episode-bg: #1e1e1e;         /* ダークモードエピソード背景色 */
         --episode-hover: #272727;      /* ダークモードエピソードホバー時背景色 */
         --episode-border: #333;        /* ダークモードエピソード境界線色 */
+        --button-hover-bg: #565656;    /* ダークモードボタンホバー時背景色 */
     }
 }
 
@@ -86,7 +88,7 @@ h1, h2, h3 {
     border-radius: 8px;
     padding: 1rem;
     box-shadow: var(--card-shadow);
-    transition: transform 0.2s;
+    transition: transform 0.2s, height 0.3s;
 }
 
 .novel-card:hover {
@@ -112,6 +114,7 @@ h1, h2, h3 {
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     color: #666;
+    transition: display 0.3s ease;
 }
 
 /* リンクスタイル */
@@ -194,6 +197,27 @@ a:hover {
     color: var(--text-color);
 }
 
+/* ----- あらすじ表示切り替えボタン ----- */
+.synopsis-toggle-container {
+    margin: 1rem 0;
+    text-align: right;
+}
+
+.synopsis-toggle-button {
+    padding: 0.5rem 1rem;
+    background-color: var(--header-bg);
+    color: var(--header-text);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+}
+
+.synopsis-toggle-button:hover {
+    background-color: var(--button-hover-bg);
+}
+
 /* ----- レスポンシブデザイン ----- */
 @media (max-width: 600px) {
     .novel-list {
@@ -210,6 +234,10 @@ a:hover {
 
     .episode-content {
         padding: 0.5rem;  /* スマホでは本文の余白を少なく */
+    }
+
+    .synopsis-toggle-container {
+        text-align: center;  /* スマホでは中央寄せ */
     }
 }
 
@@ -237,6 +265,11 @@ a:hover {
     justify-content: center;
     font-weight: bold;
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    transition: background-color 0.2s;
+}
+
+.font-button:hover {
+    background-color: var(--button-hover-bg);
 }
 
 /* 検索ボックス */
@@ -269,9 +302,13 @@ a:hover {
     line-height: 40px;
     cursor: pointer;
     opacity: 0;  /* 初期状態では非表示 */
-    transition: opacity 0.3s;
+    transition: opacity 0.3s, background-color 0.2s;
     z-index: 100;
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.back-to-top:hover {
+    background-color: var(--button-hover-bg);
 }
 
 .back-to-top.visible {
@@ -307,6 +344,11 @@ a:hover {
     border: none;
     border-radius: 8px 0 0 8px;
     cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.settings-toggle:hover {
+    background-color: var(--button-hover-bg);
 }
 
 .settings-group {

@@ -240,3 +240,104 @@ function initReadingProgress() {
         }
     }
 }
+/**
+ * あらすじの表示/非表示を切り替える機能
+ */
+
+// あらすじ表示切り替えボタン初期化関数を追加
+function initSynopsisToggle() {
+  // 小説一覧ページにのみ機能を追加
+  const novelList = document.querySelector('.novel-list');
+  if (!novelList) return;
+
+  // トグルボタンのコンテナを作成
+  const toggleContainer = document.createElement('div');
+  toggleContainer.className = 'synopsis-toggle-container';
+  toggleContainer.style.margin = '1rem 0';
+  toggleContainer.style.textAlign = 'right';
+
+  // トグルボタンを作成
+  const toggleButton = document.createElement('button');
+  toggleButton.className = 'synopsis-toggle-button';
+  toggleButton.textContent = 'あらすじを非表示';
+  toggleButton.style.padding = '0.5rem 1rem';
+  toggleButton.style.backgroundColor = 'var(--header-bg)';
+  toggleButton.style.color = 'var(--header-text)';
+  toggleButton.style.border = 'none';
+  toggleButton.style.borderRadius = '4px';
+  toggleButton.style.cursor = 'pointer';
+
+  // LocalStorageから状態を復元（デフォルトは表示）
+  const synopsisHidden = localStorage.getItem('synopsisHidden') === 'true';
+  if (synopsisHidden) {
+    toggleButton.textContent = 'あらすじを表示';
+    hideSynopsis();
+  }
+
+  // クリックイベント追加
+  toggleButton.addEventListener('click', function() {
+    const isHidden = toggleButton.textContent === 'あらすじを表示';
+    if (isHidden) {
+      toggleButton.textContent = 'あらすじを非表示';
+      showSynopsis();
+      localStorage.setItem('synopsisHidden', 'false');
+    } else {
+      toggleButton.textContent = 'あらすじを表示';
+      hideSynopsis();
+      localStorage.setItem('synopsisHidden', 'true');
+    }
+  });
+
+  // ボタンをコンテナに追加
+  toggleContainer.appendChild(toggleButton);
+
+  // トグルボタンを検索ボックスの下に挿入
+  const searchContainer = document.querySelector('.search-container');
+  if (searchContainer) {
+    searchContainer.parentNode.insertBefore(toggleContainer, searchContainer.nextSibling);
+  } else {
+    // 検索ボックスがない場合はnovelListの前に挿入
+    novelList.parentNode.insertBefore(toggleContainer, novelList);
+  }
+}
+
+// あらすじを非表示にする関数
+function hideSynopsis() {
+  const synopses = document.querySelectorAll('.novel-synopsis');
+  synopses.forEach(synopsis => {
+    synopsis.style.display = 'none';
+  });
+
+  // カードの高さを調整
+  const cards = document.querySelectorAll('.novel-card');
+  cards.forEach(card => {
+    card.style.minHeight = '0';
+  });
+}
+
+// あらすじを表示する関数
+function showSynopsis() {
+  const synopses = document.querySelectorAll('.novel-synopsis');
+  synopses.forEach(synopsis => {
+    synopsis.style.display = 'block';
+  });
+
+  // カードの高さを元に戻す
+  const cards = document.querySelectorAll('.novel-card');
+  cards.forEach(card => {
+    card.style.minHeight = '';
+  });
+}
+
+// DOMの読み込み完了時に実行されるメイン関数に追加
+document.addEventListener('DOMContentLoaded', function() {
+  // 既存の初期化関数を呼び出し
+  initFontSizeControls();
+  initSearchFunction();
+  initBackToTopButton();
+  initReadingSettings();
+  initReadingProgress();
+
+  // あらすじ表示切り替え機能を初期化
+  initSynopsisToggle();
+});
