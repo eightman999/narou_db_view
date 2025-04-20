@@ -640,12 +640,12 @@ class HTMLExporter:
                     <h1>小説ライブラリ</h1>
                 </div>
             </header>
-            
+
             <main class="container">
                 <div class="search-container">
                     <input type="text" class="search-box" placeholder="小説を検索...">
                 </div>
-                
+
                 <div class="novel-list">
         """
 
@@ -674,9 +674,9 @@ class HTMLExporter:
         html_content += """
                 </div>
             </main>
-            
+
             <button class="back-to-top">↑</button>
-            
+
             <footer class="container">
                 <p>エクスポート日時: {0}</p>
             </footer>
