@@ -10,7 +10,7 @@ from pathlib import Path
 import json
 from app.utils.logger_manager import get_logger
 from app.database.db_handler import DatabaseHandler
-from config import DATABASE_PATH
+from config import DATABASE_PATH, PACKAGE_ASSETS_DIR
 
 # ロガーの設定
 logger = get_logger('HTMLExporter')
@@ -19,6 +19,7 @@ logger = get_logger('HTMLExporter')
 class HTMLExporter:
     """
     小説データをHTML形式でエクスポートするクラス
+    assets_dirに配置されたスタイルやスクリプトを使用します
     """
 
     def __init__(self, export_dir='html_export'):
@@ -32,6 +33,9 @@ class HTMLExporter:
         self.export_dir = export_dir
         self.db_handler = DatabaseHandler()
 
+        # パッケージのassets_dirパス（CSSやJSが格納されている場所）
+        self.package_assets_dir = PACKAGE_ASSETS_DIR
+
         # エクスポート先ディレクトリの作成
         self.base_dir = Path(self.export_dir)
         self.base_dir.mkdir(exist_ok=True)
@@ -43,494 +47,270 @@ class HTMLExporter:
         self.assets_dir = self.base_dir / 'assets'
         self.assets_dir.mkdir(exist_ok=True)
 
-        # CSSファイルの作成
-        self._create_css_file()
+        # 外部アセットファイルをコピー
+        self._copy_asset_files()
 
-        # JavaScriptファイルの作成
-        self._create_js_file()
+        # Service WorkerとManifestを作成
+        self._create_service_worker()
+        self._create_manifest_json()
 
-    def _create_css_file(self):
-        """CSSファイルを作成する"""
-        css_content = """
-        :root {
-            --main-bg-color: #f7f7f7;
-            --text-color: #333;
-            --link-color: #0066cc;
-            --header-bg: #4a4a4a;
-            --header-text: #fff;
-            --card-bg: #fff;
-            --card-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            --episode-bg: #fff;
-            --episode-hover: #f0f0f0;
-            --episode-border: #eaeaea;
-            --font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
-        }
-
-        /* ダークモード対応 */
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --main-bg-color: #121212;
-                --text-color: #e0e0e0;
-                --link-color: #60a5fa;
-                --header-bg: #272727;
-                --header-text: #fff;
-                --card-bg: #1e1e1e;
-                --card-shadow: 0 2px 5px rgba(0,0,0,0.3);
-                --episode-bg: #1e1e1e;
-                --episode-hover: #272727;
-                --episode-border: #333;
-            }
-        }
-
-        body {
-            font-family: var(--font-family);
-            background-color: var(--main-bg-color);
-            color: var(--text-color);
-            line-height: 1.6;
-            margin: 0;
-            padding: 0;
-            -webkit-text-size-adjust: 100%;
-        }
-
-        header {
-            background-color: var(--header-bg);
-            color: var(--header-text);
-            padding: 1rem;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        h1, h2, h3 {
-            margin-top: 0;
-            line-height: 1.3;
-        }
-
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 1rem;
-        }
-
-        .novel-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-
-        .novel-card {
-            background-color: var(--card-bg);
-            border-radius: 8px;
-            padding: 1rem;
-            box-shadow: var(--card-shadow);
-            transition: transform 0.2s;
-        }
-
-        .novel-card:hover {
-            transform: translateY(-2px);
-        }
-
-        .novel-card h3 {
-            margin-top: 0;
-            font-size: 1.1rem;
-        }
-
-        .novel-info {
-            font-size: 0.9rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .novel-synopsis {
-            font-size: 0.9rem;
-            overflow: hidden;
-            display: -webkit-box;
-            -webkit-line-clamp: 3;
-            -webkit-box-orient: vertical;
-            color: #666;
-        }
-
-        a {
-            color: var(--link-color);
-            text-decoration: none;
-        }
-
-        a:hover {
-            text-decoration: underline;
-        }
-
-        .back-link {
-            display: inline-block;
-            margin-bottom: 1rem;
-        }
-
-        .episode-list {
-            list-style: none;
-            padding: 0;
-            margin: 1rem 0;
-        }
-
-        .episode-item {
-            background-color: var(--episode-bg);
-            border: 1px solid var(--episode-border);
-            border-radius: 4px;
-            margin-bottom: 0.5rem;
-            transition: background-color 0.2s;
-        }
-
-        .episode-item:hover {
-            background-color: var(--episode-hover);
-        }
-
-        .episode-link {
-            display: block;
-            padding: 0.75rem 1rem;
-            color: var(--text-color);
-        }
-
-        .episode-content {
-            padding: 1rem;
-            line-height: 1.8;
-            max-width: 40em;
-            margin: 0 auto;
-        }
-
-        .episode-content p {
-            margin-bottom: 1.5em;
-            text-indent: 1em;
-        }
-
-        .novel-meta {
-            background-color: var(--card-bg);
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-            box-shadow: var(--card-shadow);
-        }
-
-        .episode-nav {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 2rem;
-            padding-top: 1rem;
-            border-top: 1px solid var(--episode-border);
-        }
-
-        .nav-button {
-            padding: 0.5rem 1rem;
-            background-color: var(--card-bg);
-            border: 1px solid var(--episode-border);
-            border-radius: 4px;
-            color: var(--text-color);
-        }
-
-        @media (max-width: 600px) {
-            .novel-list {
-                grid-template-columns: 1fr;
-            }
-
-            .container {
-                padding: 0.5rem;
-            }
-
-            h1 {
-                font-size: 1.5rem;
-            }
-
-            .episode-content {
-                padding: 0.5rem;
-            }
-        }
-
-        /* フォントサイズ調整ボタン */
-        .font-size-controls {
-            position: fixed;
-            bottom: 1rem;
-            right: 1rem;
-            display: flex;
-            gap: 0.5rem;
-            z-index: 100;
-        }
-
-        .font-button {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background-color: var(--header-bg);
-            color: var(--header-text);
-            border: none;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-
-        /* 検索ボックス */
-        .search-container {
-            margin: 1rem 0;
-        }
-
-        .search-box {
-            width: 100%;
-            padding: 0.6rem;
-            border: 1px solid var(--episode-border);
-            border-radius: 4px;
-            font-size: 1rem;
-            background-color: var(--card-bg);
-            color: var(--text-color);
-        }
-
-        /* ページ上部に戻るボタン */
-        .back-to-top {
-            position: fixed;
-            bottom: 1rem;
-            left: 1rem;
-            background-color: var(--header-bg);
-            color: var(--header-text);
-            border: none;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            text-align: center;
-            line-height: 40px;
-            cursor: pointer;
-            opacity: 0;
-            transition: opacity 0.3s;
-            z-index: 100;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-
-        .back-to-top.visible {
-            opacity: 1;
-        }
-
-        /* 読書設定 */
-        .reading-settings {
-            position: fixed;
-            top: 60px;
-            right: -250px;
-            width: 250px;
-            background-color: var(--card-bg);
-            border-radius: 8px 0 0 8px;
-            box-shadow: var(--card-shadow);
-            padding: 1rem;
-            transition: right 0.3s;
-            z-index: 99;
-        }
-
-        .reading-settings.open {
-            right: 0;
-        }
-
-        .settings-toggle {
-            position: absolute;
-            left: -40px;
-            top: 10px;
-            width: 40px;
-            height: 40px;
-            background-color: var(--header-bg);
-            color: var(--header-text);
-            border: none;
-            border-radius: 8px 0 0 8px;
-            cursor: pointer;
-        }
-
-        .settings-group {
-            margin-bottom: 1rem;
-        }
-
-        .settings-group h3 {
-            font-size: 1rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .theme-selector, .font-selector, .line-height-slider {
-            width: 100%;
-            padding: 0.5rem;
-            background-color: var(--main-bg-color);
-            color: var(--text-color);
-            border: 1px solid var(--episode-border);
-            border-radius: 4px;
-        }
+    def _copy_asset_files(self):
         """
-
-        css_path = self.assets_dir / 'style.css'
-        with open(css_path, 'w', encoding='utf-8') as f:
-            f.write(css_content)
-
-        logger.info(f"CSSファイルを作成しました: {css_path}")
-
-    def _create_js_file(self):
-        """JavaScriptファイルを作成する"""
-        js_content = """
-        document.addEventListener('DOMContentLoaded', function() {
-            // フォントサイズの調整
-            const fontSizeControls = document.querySelector('.font-size-controls');
-            if (fontSizeControls) {
-                const contentElement = document.querySelector('.episode-content');
-                if (contentElement) {
-                    const increaseButton = document.getElementById('increase-font');
-                    const decreaseButton = document.getElementById('decrease-font');
-                    
-                    // 現在のフォントサイズを取得（デフォルトは16px）
-                    let currentSize = localStorage.getItem('fontSize') || 16;
-                    contentElement.style.fontSize = currentSize + 'px';
-                    
-                    increaseButton.addEventListener('click', function() {
-                        currentSize = Math.min(parseInt(currentSize) + 2, 32);
-                        contentElement.style.fontSize = currentSize + 'px';
-                        localStorage.setItem('fontSize', currentSize);
-                    });
-                    
-                    decreaseButton.addEventListener('click', function() {
-                        currentSize = Math.max(parseInt(currentSize) - 2, 12);
-                        contentElement.style.fontSize = currentSize + 'px';
-                        localStorage.setItem('fontSize', currentSize);
-                    });
-                }
-            }
-            
-            // 検索機能
-            const searchBox = document.querySelector('.search-box');
-            if (searchBox) {
-                const items = document.querySelectorAll('.novel-card, .episode-item');
-                
-                searchBox.addEventListener('input', function() {
-                    const searchTerm = this.value.toLowerCase();
-                    
-                    items.forEach(item => {
-                        const text = item.textContent.toLowerCase();
-                        if (text.includes(searchTerm)) {
-                            item.style.display = '';
-                        } else {
-                            item.style.display = 'none';
-                        }
-                    });
-                });
-            }
-            
-            // TOPに戻るボタン
-            const backToTopButton = document.querySelector('.back-to-top');
-            if (backToTopButton) {
-                window.addEventListener('scroll', function() {
-                    if (window.pageYOffset > 300) {
-                        backToTopButton.classList.add('visible');
-                    } else {
-                        backToTopButton.classList.remove('visible');
-                    }
-                });
-                
-                backToTopButton.addEventListener('click', function() {
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                });
-            }
-            
-            // 読書設定
-            const settingsToggle = document.querySelector('.settings-toggle');
-            if (settingsToggle) {
-                const readingSettings = document.querySelector('.reading-settings');
-                
-                settingsToggle.addEventListener('click', function() {
-                    readingSettings.classList.toggle('open');
-                });
-                
-                // テーマ切替
-                const themeSelector = document.getElementById('theme-selector');
-                if (themeSelector) {
-                    // 保存されたテーマを適用
-                    const savedTheme = localStorage.getItem('theme');
-                    if (savedTheme) {
-                        document.body.classList.add(savedTheme);
-                        themeSelector.value = savedTheme;
-                    }
-                    
-                    themeSelector.addEventListener('change', function() {
-                        // 既存のテーマクラスを削除
-                        document.body.classList.remove('light-theme', 'dark-theme', 'sepia-theme');
-                        
-                        if (this.value !== 'default') {
-                            document.body.classList.add(this.value);
-                            localStorage.setItem('theme', this.value);
-                        } else {
-                            localStorage.removeItem('theme');
-                        }
-                    });
-                }
-                
-                // フォント変更
-                const fontSelector = document.getElementById('font-selector');
-                if (fontSelector) {
-                    // 保存されたフォントを適用
-                    const savedFont = localStorage.getItem('fontFamily');
-                    if (savedFont) {
-                        document.body.style.fontFamily = savedFont;
-                        fontSelector.value = savedFont;
-                    }
-                    
-                    fontSelector.addEventListener('change', function() {
-                        if (this.value !== 'default') {
-                            document.body.style.fontFamily = this.value;
-                            localStorage.setItem('fontFamily', this.value);
-                        } else {
-                            document.body.style.fontFamily = '';
-                            localStorage.removeItem('fontFamily');
-                        }
-                    });
-                }
-                
-                // 行間調整
-                const lineHeightSlider = document.getElementById('line-height-slider');
-                if (lineHeightSlider) {
-                    const contentElement = document.querySelector('.episode-content');
-                    if (contentElement) {
-                        // 保存された行間を適用
-                        const savedLineHeight = localStorage.getItem('lineHeight');
-                        if (savedLineHeight) {
-                            contentElement.style.lineHeight = savedLineHeight;
-                            lineHeightSlider.value = parseFloat(savedLineHeight);
-                        }
-                        
-                        lineHeightSlider.addEventListener('input', function() {
-                            contentElement.style.lineHeight = this.value;
-                            localStorage.setItem('lineHeight', this.value);
-                        });
-                    }
-                }
-            }
-            
-            // 進捗保存（最後に読んだ位置を保存）
-            const episodeContent = document.querySelector('.episode-content');
-            if (episodeContent) {
-                const novelId = document.body.getAttribute('data-novel-id');
-                const episodeId = document.body.getAttribute('data-episode-id');
-                
-                if (novelId && episodeId) {
-                    const scrollKey = `scroll_${novelId}_${episodeId}`;
-                    const savedPosition = localStorage.getItem(scrollKey);
-                    
-                    if (savedPosition) {
-                        window.scrollTo(0, parseInt(savedPosition));
-                    }
-                    
-                    window.addEventListener('scroll', function() {
-                        localStorage.setItem(scrollKey, window.pageYOffset);
-                    });
-                }
-            }
-        });
+        外部アセットファイル（CSS、JS）をエクスポート先にコピー
         """
+        # パッケージのassetsディレクトリが存在するか確認
+        if not self.package_assets_dir.exists():
+            logger.warning(f"アセットディレクトリが見つかりません: {self.package_assets_dir}")
+            logger.info("アセットディレクトリを作成します")
+            self.package_assets_dir.mkdir(exist_ok=True)
 
-        js_path = self.assets_dir / 'script.js'
-        with open(js_path, 'w', encoding='utf-8') as f:
-            f.write(js_content)
+        # CSS、JSの各ファイルをチェック
+        css_file = self.package_assets_dir / 'style.css'
+        js_file = self.package_assets_dir / 'script.js'
 
-        logger.info(f"JavaScriptファイルを作成しました: {js_path}")
+        # CSSファイルをコピー
+        if css_file.exists():
+            shutil.copy(css_file, self.assets_dir / 'style.css')
+            logger.info(f"CSSファイルをコピーしました: {css_file} -> {self.assets_dir / 'style.css'}")
+        else:
+            logger.warning(f"CSSファイルが見つかりません: {css_file}")
+            logger.info("CSSファイルは別途用意する必要があります")
+
+        # JSファイルをコピー
+        if js_file.exists():
+            shutil.copy(js_file, self.assets_dir / 'script.js')
+            logger.info(f"JavaScriptファイルをコピーしました: {js_file} -> {self.assets_dir / 'script.js'}")
+        else:
+            logger.warning(f"JavaScriptファイルが見つかりません: {js_file}")
+            logger.info("JavaScriptファイルは別途用意する必要があります")
+
+    def _create_service_worker(self):
+        """
+        Service Workerファイルを作成
+        パッケージ内のテンプレートを使用するか、シンプルなバージョンを作成
+        """
+        # Service Workerファイルのパス
+        sw_path = self.base_dir / 'service-worker.js'
+
+        # パッケージ内のテンプレートをチェック
+        sw_template = self.package_assets_dir / 'service-worker.js'
+
+        if sw_template.exists():
+            # テンプレートがある場合はコピー
+            shutil.copy(sw_template, sw_path)
+            logger.info(f"Service Workerテンプレートをコピーしました: {sw_template} -> {sw_path}")
+        else:
+            # テンプレートがない場合は基本的な内容を生成
+            logger.info(f"Service Workerテンプレートが見つからないため、基本バージョンを作成します: {sw_path}")
+
+            # キャッシュするリソースのリスト
+            cached_urls = [
+                './',
+                './index.html',
+                './assets/style.css',
+                './assets/script.js',
+                './manifest.json'
+            ]
+
+            # 各キャッシュURLをJSON文字列化
+            cache_list = ',\n    '.join([f"'{url}'" for url in cached_urls])
+
+            # Service Workerの基本構造
+            simple_sw = f"""// 小説ライブラリ用 Service Worker
+const CACHE_NAME = 'novel-library-cache-v1';
+
+// キャッシュするリソースのリスト
+const urlsToCache = [
+    {cache_list}
+];
+
+// Service Workerインストール時
+self.addEventListener('install', event => {{
+    event.waitUntil(
+        caches.open(CACHE_NAME)
+            .then(cache => {{
+                console.log('キャッシュを開きました');
+                return cache.addAll(urlsToCache);
+            }})
+    );
+}});
+
+// フェッチ時の処理（キャッシュファースト）
+self.addEventListener('fetch', event => {{
+    event.respondWith(
+        caches.match(event.request)
+            .then(response => {{
+                if (response) {{
+                    return response;
+                }}
+                return fetch(event.request);
+            }})
+    );
+}});
+
+// 古いキャッシュの削除
+self.addEventListener('activate', event => {{
+    const cacheWhitelist = [CACHE_NAME];
+    event.waitUntil(
+        caches.keys().then(cacheNames => {{
+            return Promise.all(
+                cacheNames.map(cacheName => {{
+                    if (cacheWhitelist.indexOf(cacheName) === -1) {{
+                        return caches.delete(cacheName);
+                    }}
+                }})
+            );
+        }})
+    );
+}});
+"""
+            # ファイルに書き込み
+            with open(sw_path, 'w', encoding='utf-8') as f:
+                f.write(simple_sw)
+
+            logger.info(f"基本的なService Workerファイルを作成しました: {sw_path}")
+
+    def _create_manifest_json(self):
+        """
+        PWA用のmanifest.jsonファイルを作成
+        パッケージ内のテンプレートを使用するか、シンプルなバージョンを作成
+        """
+        # マニフェストファイルのパス
+        manifest_path = self.base_dir / 'manifest.json'
+
+        # パッケージ内のテンプレートをチェック
+        manifest_template = self.package_assets_dir / 'manifest.json'
+
+        if manifest_template.exists():
+            # テンプレートがある場合はコピー
+            shutil.copy(manifest_template, manifest_path)
+            logger.info(f"マニフェストテンプレートをコピーしました: {manifest_template} -> {manifest_path}")
+        else:
+            # テンプレートがない場合は基本的な内容を生成
+            logger.info(f"マニフェストテンプレートが見つからないため、基本バージョンを作成します: {manifest_path}")
+
+            # 基本的なマニフェスト情報
+            manifest_data = {
+                "name": "小説ライブラリ",
+                "short_name": "小説App",
+                "description": "オフラインで読める小説ライブラリ",
+                "start_url": "./index.html",
+                "display": "standalone",
+                "background_color": "#ffffff",
+                "theme_color": "#4a4a4a",
+                "icons": [
+                    {
+                        "src": "assets/icon-192.png",
+                        "sizes": "192x192",
+                        "type": "image/png"
+                    },
+                    {
+                        "src": "assets/icon-512.png",
+                        "sizes": "512x512",
+                        "type": "image/png"
+                    }
+                ]
+            }
+
+            # JSONファイルとして書き込み
+            with open(manifest_path, 'w', encoding='utf-8') as f:
+                json.dump(manifest_data, f, ensure_ascii=False, indent=2)
+
+            logger.info(f"基本的なマニフェストファイルを作成しました: {manifest_path}")
+
+    def _create_simple_icons(self):
+        """
+        シンプルなアイコンを生成（PWA用）
+        """
+        try:
+            # PILが利用可能か確認
+            try:
+                from PIL import Image, ImageDraw, ImageFont
+                pil_available = True
+            except ImportError:
+                logger.warning("PILモジュールが見つからないため、サンプルアイコンの作成をスキップします")
+                logger.info("アイコンファイルは別途用意する必要があります")
+                return
+
+            # アイコン用のディレクトリを作成
+            icons_dir = self.assets_dir
+            icons_dir.mkdir(exist_ok=True)
+
+            # アイコンテンプレートをチェック
+            icon_template_192 = self.package_assets_dir / 'icon-192.png'
+            icon_template_512 = self.package_assets_dir / 'icon-512.png'
+
+            # テンプレートが存在する場合はコピー
+            if icon_template_192.exists() and icon_template_512.exists():
+                shutil.copy(icon_template_192, self.assets_dir / 'icon-192.png')
+                shutil.copy(icon_template_512, self.assets_dir / 'icon-512.png')
+                logger.info("アイコンテンプレートをコピーしました")
+                return
+
+            # テンプレートがない場合は新規作成
+            logger.info("アイコンテンプレートが見つからないため、シンプルなアイコンを作成します")
+
+            # 背景色とテキスト色
+            bg_color = (74, 74, 74)  # ヘッダーと同じグレー
+            text_color = (255, 255, 255)  # 白
+
+            # 192x192サイズのアイコン
+            img_192 = Image.new('RGB', (192, 192), bg_color)
+            draw_192 = ImageDraw.Draw(img_192)
+
+            # 512x512サイズのアイコン
+            img_512 = Image.new('RGB', (512, 512), bg_color)
+            draw_512 = ImageDraw.Draw(img_512)
+
+            # フォントが利用可能か確認
+            try:
+                # 適切なフォントを探す
+                font_paths = [
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",  # Linux
+                    "/System/Library/Fonts/ヒラギノ角ゴシック W6.ttc",  # macOS
+                    "C:\\Windows\\Fonts\\meiryo.ttc",  # Windows
+                    "Arial"  # フォールバック
+                ]
+
+                font_path = None
+                for path in font_paths:
+                    if os.path.exists(path):
+                        font_path = path
+                        break
+
+                # フォントでテキスト描画
+                if font_path:
+                    font_192 = ImageFont.truetype(font_path, 80)
+                    draw_192.text((96, 96), "小", fill=text_color, font=font_192, anchor="mm")
+
+                    font_512 = ImageFont.truetype(font_path, 200)
+                    draw_512.text((256, 256), "小", fill=text_color, font=font_512, anchor="mm")
+                else:
+                    # フォントが見つからない場合は円を描画
+                    raise FileNotFoundError("適切なフォントが見つかりません")
+            except Exception as e:
+                logger.warning(f"テキスト描画に失敗しました: {e}")
+                # 円を描画（フォールバック）
+                draw_192.ellipse((48, 48, 144, 144), fill=text_color)
+                draw_512.ellipse((128, 128, 384, 384), fill=text_color)
+
+            # アイコンを保存
+            img_192.save(self.assets_dir / 'icon-192.png')
+            img_512.save(self.assets_dir / 'icon-512.png')
+
+            logger.info("シンプルなアイコンファイルを作成しました")
+
+        except Exception as e:
+            logger.warning(f"アイコン生成に失敗しました: {e}")
+            logger.info("アイコンファイルは別途用意する必要があります")
 
     def export_all_novels(self):
-        """全ての小説をエクスポート"""
+        """
+        全ての小説をエクスポート
+
+        Returns:
+            bool: 成功したかどうか
+        """
         try:
             # 小説リストの取得
             novels = self.db_handler.get_all_novels()
@@ -539,7 +319,7 @@ class HTMLExporter:
                 logger.warning("エクスポートする小説がありません")
                 return False
 
-            # インデックスページの作成（必ず実行）
+            # インデックスページの作成
             logger.info("インデックスページを作成します...")
             self._create_index_page(novels)
 
@@ -554,6 +334,9 @@ class HTMLExporter:
                     logger.error(f"小説 {ncode} のエクスポート中にエラーが発生しました: {e}")
                     import traceback
                     logger.error(traceback.format_exc())
+
+            # PWA用のアイコンを作成
+            self._create_simple_icons()
 
             logger.info(f"全ての小説のエクスポートが完了しました。合計: {len(novels)}作品")
             return True
@@ -633,6 +416,7 @@ class HTMLExporter:
             <title>小説ライブラリ</title>
             <link rel="stylesheet" href="assets/style.css">
             <script src="assets/script.js" defer></script>
+            <link rel="manifest" href="manifest.json">
         </head>
         <body>
             <header>
@@ -640,12 +424,12 @@ class HTMLExporter:
                     <h1>小説ライブラリ</h1>
                 </div>
             </header>
-
+            
             <main class="container">
                 <div class="search-container">
                     <input type="text" class="search-box" placeholder="小説を検索...">
                 </div>
-
+                
                 <div class="novel-list">
         """
 
@@ -671,18 +455,33 @@ class HTMLExporter:
             </div>
             """
 
-        html_content += """
+        html_content += f"""
                 </div>
             </main>
-
+            
             <button class="back-to-top">↑</button>
-
+            
             <footer class="container">
-                <p>エクスポート日時: {0}</p>
+                <p>エクスポート日時: {now}</p>
             </footer>
+
+            <script>
+                // Service Workerの登録
+                if ('serviceWorker' in navigator) {{
+                    window.addEventListener('load', function() {{
+                        navigator.serviceWorker.register('./service-worker.js')
+                            .then(function(registration) {{
+                                console.log('Service Worker登録成功:', registration.scope);
+                            }})
+                            .catch(function(error) {{
+                                console.log('Service Worker登録失敗:', error);
+                            }});
+                    }});
+                }}
+            </script>
         </body>
         </html>
-        """.format(now)
+        """
 
         # ファイルに書き込み
         index_path = self.base_dir / 'index.html'
@@ -814,7 +613,6 @@ class HTMLExporter:
         if episode_index > 0:
             prev_episode = sorted_episodes[episode_index - 1]
             prev_no = prev_episode[0]
-            prev_title = prev_episode[1]
             prev_link = f'<a href="episode_{prev_no}.html" class="nav-button">← 前話: 第{prev_no}話</a>'
         else:
             prev_link = '<span></span>'
@@ -822,7 +620,6 @@ class HTMLExporter:
         if episode_index < len(sorted_episodes) - 1:
             next_episode = sorted_episodes[episode_index + 1]
             next_no = next_episode[0]
-            next_title = next_episode[1]
             next_link = f'<a href="episode_{next_no}.html" class="nav-button">次話: 第{next_no}話 →</a>'
         else:
             next_link = '<span></span>'
@@ -908,156 +705,48 @@ class HTMLExporter:
 
         logger.info(f"エピソードページを作成しました: {episode_path}")
 
-    def _create_simple_icons(self):
-        """シンプルなアイコンを生成する（PWA用）"""
-        try:
-            from PIL import Image, ImageDraw, ImageFont
-
-            # 背景色
-            bg_color = (74, 74, 74)  # ヘッダーと同じグレー
-            text_color = (255, 255, 255)  # 白
-
-            # 192x192サイズのアイコン
-            img_192 = Image.new('RGB', (192, 192), bg_color)
-            draw_192 = ImageDraw.Draw(img_192)
-
-            # テキスト描画（フォントがなければ中央に円を描画）
-            try:
-                font = ImageFont.truetype("Arial", 80)
-                draw_192.text((96, 96), "小", fill=text_color, font=font, anchor="mm")
-            except:
-                draw_192.ellipse((48, 48, 144, 144), fill=text_color)
-
-            # 512x512サイズのアイコン
-            img_512 = Image.new('RGB', (512, 512), bg_color)
-            draw_512 = ImageDraw.Draw(img_512)
-
-            try:
-                font = ImageFont.truetype("Arial", 200)
-                draw_512.text((256, 256), "小", fill=text_color, font=font, anchor="mm")
-            except:
-                draw_512.ellipse((128, 128, 384, 384), fill=text_color)
-
-            # 保存
-            img_192.save(self.assets_dir / 'icon-192.png')
-            img_512.save(self.assets_dir / 'icon-512.png')
-
-            logger.info("アイコンファイルを作成しました")
-
-        except Exception as e:
-            logger.warning(f"アイコン生成に失敗しました（PWAアイコンが表示されない可能性があります）: {e}")
-            # PILがない場合のフォールバック: 何もしない
-
-    def create_manifest_json(self):
-        """PWA用のmanifest.jsonファイルを作成する"""
-        manifest = {
-            "name": "小説ライブラリ",
-            "short_name": "小説App",
-            "description": "オフラインで読める小説ライブラリ",
-            "start_url": "./index.html",
-            "display": "standalone",
-            "background_color": "#ffffff",
-            "theme_color": "#4a4a4a",
-            "icons": [
-                {
-                    "src": "assets/icon-192.png",
-                    "sizes": "192x192",
-                    "type": "image/png"
-                },
-                {
-                    "src": "assets/icon-512.png",
-                    "sizes": "512x512",
-                    "type": "image/png"
-                }
-            ]
-        }
-
-        manifest_path = self.base_dir / 'manifest.json'
-        with open(manifest_path, 'w', encoding='utf-8') as f:
-            json.dump(manifest, f, ensure_ascii=False, indent=2)
-
-        logger.info(f"manifest.jsonを作成しました: {manifest_path}")
-
-    def create_service_worker(self):
-        """PWA用のService Workerファイルを作成する"""
-        sw_content = """
-        // Service Worker for 小説ライブラリ
-        const CACHE_NAME = 'novel-library-cache-v1';
-        
-        // キャッシュするリソースのリスト
-        const urlsToCache = [
-            './',
-            './index.html',
-            './assets/style.css',
-            './assets/script.js',
-            './manifest.json'
-        ];
-        
-        // Service Workerのインストール時
-        self.addEventListener('install', event => {
-            event.waitUntil(
-                caches.open(CACHE_NAME)
-                    .then(cache => {
-                        console.log('キャッシュをオープンしました');
-                        return cache.addAll(urlsToCache);
-                    })
-            );
-        });
-        
-        // ネットワークリクエスト時
-        self.addEventListener('fetch', event => {
-            event.respondWith(
-                caches.match(event.request)
-                    .then(response => {
-                        // キャッシュにあればそれを返す
-                        if (response) {
-                            return response;
-                        }
-                        
-                        // キャッシュになければネットワークから取得
-                        return fetch(event.request)
-                            .then(networkResponse => {
-                                // レスポンスが有効なら、キャッシュに追加
-                                if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-                                    return networkResponse;
-                                }
-                                
-                                const responseToCache = networkResponse.clone();
-                                
-                                caches.open(CACHE_NAME)
-                                    .then(cache => {
-                                        cache.put(event.request, responseToCache);
-                                    });
-                                
-                                return networkResponse;
-                            });
-                    })
-            );
-        });
-        
-        // 古いキャッシュの削除
-        self.addEventListener('activate', event => {
-            const cacheWhitelist = [CACHE_NAME];
-            
-            event.waitUntil(
-                caches.keys().then(cacheNames => {
-                    return Promise.all(
-                        cacheNames.map(cacheName => {
-                            if (cacheWhitelist.indexOf(cacheName) === -1) {
-                                return caches.delete(cacheName);
-                            }
-                        })
-                    );
-                })
-            );
-        });
+    def create_readme(self):
         """
+        使い方などを説明したREADMEファイルを作成
+        """
+        # 現在日時を取得
+        now = datetime.datetime.now().strftime('%Y年%m月%d日 %H:%M:%S')
 
-        sw_path = self.base_dir / 'service-worker.js'
-        with open(sw_path, 'w', encoding='utf-8') as f:
-            f.write(sw_content)
+        readme_content = f"""# 小説ライブラリ - 使い方
 
-        logger.info(f"Service Workerを作成しました: {sw_path}")
+## 概要
+このHTMLエクスポートは、データベースに保存された小説データをオフラインで読めるようにHTMLに変換したものです。
+Android端末のブラウザで開くことで、小説を快適に読むことができます。
+
+## 使い方
+
+### インストール方法
+1. このフォルダ全体をAndroid端末に転送します
+2. ブラウザで「index.html」を開きます
+3. PWA対応ブラウザ（ChromeやEdgeなど）であれば、「ホーム画面に追加」からアプリのように使用できます
+
+### 機能
+- 小説一覧：トップページから全小説が閲覧できます
+- 検索機能：タイトルや作者名で検索できます
+- 読書設定：フォント、テーマ、行間などを調整できます
+- 自動スクロール位置保存：前回読んでいた位置を自動的に記憶します
+- ダークモード対応：システムの設定に応じて自動的に切り替わります
+
+### 注意事項
+- このエクスポートデータは定期的に更新する必要があります
+- 画像などのリッチコンテンツには対応していません
+
+## 更新履歴
+- 初回エクスポート日時: {now}
+"""
+
+        # ファイルに書き込み
+        readme_path = self.base_dir / 'README.txt'
+        with open(readme_path, 'w', encoding='utf-8') as f:
+            f.write(readme_content)
+
+        logger.info(f"READMEファイルを作成しました: {readme_path}")
+
     def export_as_zip(self, zip_filename='novel_library.zip'):
         """
         エクスポートディレクトリをZIPにまとめる
@@ -1070,12 +759,10 @@ class HTMLExporter:
         """
         import zipfile
 
-        # PWA対応ファイルを作成
-        self.create_manifest_json()
-        self.create_service_worker()
+        # READMEファイルを作成
         self.create_readme()
 
-        # シンプルなアイコンを作成
+        # PWA用アイコンを作成（必要であれば）
         self._create_simple_icons()
 
         # ZIPファイルを作成
@@ -1089,43 +776,6 @@ class HTMLExporter:
 
         logger.info(f"エクスポートデータをZIPにまとめました: {zip_path}")
         return str(zip_path)
-    def create_readme(self):
-        """使い方などを説明したREADMEファイルを作成する"""
-        readme_content = """
-        # 小説ライブラリ - 使い方
-
-        ## 概要
-        このHTMLエクスポートは、データベースに保存された小説データをオフラインで読めるようにHTMLに変換したものです。
-        Android端末のブラウザで開くことで、小説を快適に読むことができます。
-
-        ## 使い方
-
-        ### インストール方法
-        1. このフォルダ全体をAndroid端末に転送します
-        2. ブラウザで「index.html」を開きます
-        3. PWA対応ブラウザ（ChromeやEdgeなど）であれば、「ホーム画面に追加」からアプリのように使用できます
-
-        ### 機能
-        - 小説一覧：トップページから全小説が閲覧できます
-        - 検索機能：タイトルや作者名で検索できます
-        - 読書設定：フォント、テーマ、行間などを調整できます
-        - 自動スクロール位置保存：前回読んでいた位置を自動的に記憶します
-        - ダークモード対応：システムの設定に応じて自動的に切り替わります
-
-        ### 注意事項
-        - このエクスポートデータは定期的に更新する必要があります
-        - 画像などのリッチコンテンツには対応していません
-
-        ## 更新履歴
-        - 初回エクスポート日時: {0}
-        """
-
-        now = datetime.datetime.now().strftime('%Y年%m月%d日 %H:%M:%S')
-        readme_path = self.base_dir / 'README.txt'
-        with open(readme_path, 'w', encoding='utf-8') as f:
-            f.write(readme_content.format(now))
-
-        logger.info(f"READMEファイルを作成しました: {readme_path}")
 
 
 def run_export(export_dir='html_export', create_zip=True):

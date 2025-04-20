@@ -14,7 +14,7 @@ SETTINGS_FILE = os.path.join(ROOT_DIR, 'settings.ini')
 # ダウンロードディレクトリ
 DOWNLOAD_DIR = os.path.join(ROOT_DIR, 'dl')
 YML_DIR = os.path.join(ROOT_DIR, 'yml')
-
+PACKAGE_ASSETS_DIR = os.path.join(ROOT_DIR, 'package_assets')
 # 作成するディレクトリの確認
 REQUIRED_DIRS = [
     DATABASE_DIR,
