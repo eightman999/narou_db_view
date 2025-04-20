@@ -74,15 +74,27 @@ class HTMLExporter:
             logger.info(f"CSSファイルをコピーしました: {css_file} -> {self.assets_dir / 'style.css'}")
         else:
             logger.warning(f"CSSファイルが見つかりません: {css_file}")
-            logger.info("CSSファイルは別途用意する必要があります")
+            # テンプレートファイルからコピー
+            style_template = self.package_assets_dir / 'style-css.css'
+            if style_template.exists():
+                shutil.copy(style_template, self.assets_dir / 'style.css')
+                logger.info(f"CSSテンプレートをコピーしました: {style_template} -> {self.assets_dir / 'style.css'}")
+            else:
+                logger.warning("CSSファイルは別途用意する必要があります")
 
         # JSファイルをコピー
         if js_file.exists():
             shutil.copy(js_file, self.assets_dir / 'script.js')
             logger.info(f"JavaScriptファイルをコピーしました: {js_file} -> {self.assets_dir / 'script.js'}")
         else:
-            logger.warning(f"JavaScriptファイルが見つかりません: {js_file}")
-            logger.info("JavaScriptファイルは別途用意する必要があります")
+            # テンプレートファイルからコピー
+            script_template = self.package_assets_dir / 'script-js.js'
+            if script_template.exists():
+                shutil.copy(script_template, self.assets_dir / 'script.js')
+                logger.info(f"JavaScriptテンプレートをコピーしました: {script_template} -> {self.assets_dir / 'script.js'}")
+            else:
+                logger.warning(f"JavaScriptファイルが見つかりません: {js_file}")
+                logger.info("JavaScriptファイルは別途用意する必要があります")
 
     def _create_service_worker(self):
         """
@@ -94,6 +106,10 @@ class HTMLExporter:
 
         # パッケージ内のテンプレートをチェック
         sw_template = self.package_assets_dir / 'service-worker.js'
+
+        # テンプレートが存在しない場合、別名のファイルを確認
+        if not sw_template.exists():
+            sw_template = self.package_assets_dir / 'serviceworker-js.js'
 
         if sw_template.exists():
             # テンプレートがある場合はコピー
@@ -180,6 +196,10 @@ self.addEventListener('activate', event => {{
 
         # パッケージ内のテンプレートをチェック
         manifest_template = self.package_assets_dir / 'manifest.json'
+
+        # テンプレートが存在しない場合、別名のファイルを確認
+        if not manifest_template.exists():
+            manifest_template = self.package_assets_dir / 'manifest-json.json'
 
         if manifest_template.exists():
             # テンプレートがある場合はコピー
