@@ -94,3 +94,78 @@ self.addEventListener('activate', event => {
         })
     );
 });
+
+/**
+ * リスト表示/グリッド表示の切り替え機能
+ */
+function initViewToggle() {
+  // 小説一覧ページにのみ機能を追加
+  const novelList = document.querySelector('.novel-list');
+  if (!novelList) return;
+
+  // トグルボタンのコンテナを作成
+  const toggleContainer = document.createElement('div');
+  toggleContainer.className = 'view-toggle-container';
+
+  // トグルボタンを作成
+  const toggleButton = document.createElement('button');
+  toggleButton.className = 'view-toggle-button';
+  toggleButton.textContent = 'シンプルリスト表示';
+
+  // LocalStorageから状態を復元（デフォルトはグリッド表示）
+  const isListView = localStorage.getItem('novelListView') === 'list';
+  if (isListView) {
+    toggleButton.textContent = 'グリッド表示';
+    novelList.classList.add('list-view');
+  }
+
+  // クリックイベント追加
+  toggleButton.addEventListener('click', function() {
+    const isListView = novelList.classList.contains('list-view');
+    if (isListView) {
+      // リスト表示 → グリッド表示
+      toggleButton.textContent = 'シンプルリスト表示';
+      novelList.classList.remove('list-view');
+      localStorage.setItem('novelListView', 'grid');
+    } else {
+      // グリッド表示 → リスト表示
+      toggleButton.textContent = 'グリッド表示';
+      novelList.classList.add('list-view');
+      localStorage.setItem('novelListView', 'list');
+    }
+  });
+
+  // ボタンをコンテナに追加
+  toggleContainer.appendChild(toggleButton);
+
+  // トグルボタンをあらすじトグルボタンの下に挿入
+  const synopsisToggleContainer = document.querySelector('.synopsis-toggle-container');
+  if (synopsisToggleContainer) {
+    synopsisToggleContainer.after(toggleContainer);
+  } else {
+    // あらすじトグルがない場合は検索ボックスの下に挿入
+    const searchContainer = document.querySelector('.search-container');
+    if (searchContainer) {
+      searchContainer.after(toggleContainer);
+    } else {
+      // 検索ボックスもない場合はnovelListの前に挿入
+      novelList.before(toggleContainer);
+    }
+  }
+}
+
+// DOMの読み込み完了時に実行されるメイン関数に追加
+document.addEventListener('DOMContentLoaded', function() {
+  // 既存の初期化関数を呼び出し
+  initFontSizeControls();
+  initSearchFunction();
+  initBackToTopButton();
+  initReadingSettings();
+  initReadingProgress();
+
+  // あらすじ表示切り替え機能を初期化
+  initSynopsisToggle();
+
+  // リスト表示/グリッド表示切り替え機能を初期化
+  initViewToggle();
+});

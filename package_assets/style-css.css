@@ -368,3 +368,83 @@ a:hover {
     border: 1px solid var(--episode-border);
     border-radius: 4px;
 }
+
+/* グリッド表示とリスト表示のスタイル */
+.novel-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+    transition: all 0.3s ease;
+}
+
+/* リスト表示モード */
+.novel-list.list-view {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+/* リスト表示時のカードスタイル */
+.novel-list.list-view .novel-card {
+    display: flex;
+    flex-direction: column;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    min-height: auto;
+}
+
+.novel-list.list-view .novel-card h3 {
+    margin: 0 0 0.25rem 0;
+    font-size: 1rem;
+}
+
+.novel-list.list-view .novel-info {
+    font-size: 0.8rem;
+    margin-bottom: 0.25rem;
+}
+
+.novel-list.list-view .novel-synopsis {
+    font-size: 0.8rem;
+    -webkit-line-clamp: 1; /* リスト表示では1行だけ表示 */
+}
+
+/* 表示切替ボタン */
+.view-toggle-container {
+    display: flex;
+    justify-content: flex-end;
+    margin: 1rem 0;
+}
+
+.view-toggle-button {
+    padding: 0.5rem 1rem;
+    background-color: var(--header-bg);
+    color: var(--header-text);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+}
+
+.view-toggle-button:hover {
+    background-color: var(--button-hover-bg);
+}
+
+/* ダークモード対応 */
+@media (prefers-color-scheme: dark) {
+    .view-toggle-button {
+        background-color: var(--header-bg);
+    }
+
+    .view-toggle-button:hover {
+        background-color: var(--button-hover-bg);
+    }
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 600px) {
+    .view-toggle-container {
+        justify-content: center;
+    }
+}

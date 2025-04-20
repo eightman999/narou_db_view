@@ -5,9 +5,6 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="bad1a08a-9700-4753-8d26-2a6749864910" name="変更" comment="っっl">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/utils/exporters/html_exporter.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/utils/exporters/html_exporter.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package_assets/script-js.js" beforeDir="false" afterPath="$PROJECT_DIR$/package_assets/script-js.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/package_assets/style-css.css" beforeDir="false" afterPath="$PROJECT_DIR$/package_assets/style-css.css" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -299,7 +296,7 @@
       <workItem from="1744717457085" duration="10104000" />
       <workItem from="1744885341388" duration="10289000" />
       <workItem from="1744980867117" duration="6624000" />
-      <workItem from="1745117196830" duration="4569000" />
+      <workItem from="1745117196830" duration="5062000" />
     </task>
     <task id="LOCAL-00001" summary="っっl">
       <option name="closed" value="true" />
