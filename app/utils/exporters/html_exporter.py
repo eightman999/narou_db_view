@@ -34,7 +34,7 @@ class HTMLExporter:
         self.db_handler = DatabaseHandler()
 
         # パッケージのassets_dirパス（CSSやJSが格納されている場所）
-        self.package_assets_dir = PACKAGE_ASSETS_DIR
+        self.package_assets_dir = Path(PACKAGE_ASSETS_DIR)
 
         # エクスポート先ディレクトリの作成
         self.base_dir = Path(self.export_dir)
