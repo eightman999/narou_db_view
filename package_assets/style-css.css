@@ -448,3 +448,132 @@ a:hover {
         justify-content: center;
     }
 }
+
+/*
+ * 最近読んだ小説・しおり機能のための追加スタイル
+ */
+
+/* 最近読んだ小説セクション */
+.recent-novels-section {
+    margin-top: 2rem;
+    margin-bottom: 2rem;
+    border-top: 1px solid var(--episode-border);
+    padding-top: 1rem;
+}
+
+.recent-novels-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+.recent-novel-item {
+    background-color: var(--card-bg);
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: var(--card-shadow);
+    border-left: 4px solid #3b82f6;
+    transition: transform 0.2s;
+}
+
+.recent-novel-item:hover {
+    transform: translateY(-2px);
+}
+
+.recent-novel-item h3 {
+    margin-top: 0;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+}
+
+.recent-novel-info {
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.recent-novel-timestamp {
+    font-size: 0.8rem;
+    color: #666;
+}
+
+/* 続きから読むボタン */
+.continue-reading-button {
+    margin-top: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.continue-reading {
+    display: inline-block;
+    background-color: #3b82f6;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    font-weight: bold;
+    transition: background-color 0.2s, transform 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.continue-reading:hover {
+    background-color: #2563eb;
+    text-decoration: none;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.continue-reading:active {
+    transform: translateY(0);
+}
+
+/* メインページのセクション見出し調整 */
+main .container h2 {
+    border-bottom: 2px solid var(--header-bg);
+    padding-bottom: 0.5rem;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+}
+
+/* 履歴がない場合のメッセージ */
+.recent-novels-list p {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: #666;
+    padding: 2rem;
+    background-color: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: var(--card-shadow);
+}
+
+/* ダークモード対応 */
+@media (prefers-color-scheme: dark) {
+    .recent-novel-timestamp {
+        color: #aaa;
+    }
+
+    .recent-novels-list p {
+        color: #aaa;
+    }
+
+    .continue-reading {
+        background-color: #3b82f6;
+    }
+
+    .continue-reading:hover {
+        background-color: #2563eb;
+    }
+
+    .recent-novel-item {
+        border-left-color: #3b82f6;
+    }
+}
+
+/* モバイル対応 */
+@media (max-width: 600px) {
+    .recent-novels-list {
+        grid-template-columns: 1fr;
+    }
+
+    .continue-reading {
+        display: block;
+        text-align: center;
+    }
+}

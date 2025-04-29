@@ -418,9 +418,11 @@ self.addEventListener('activate', event => {{
             return False
 
     # HTMLExporterクラスの_create_index_pageメソッドを修正
+    # _create_index_pageメソッドの修正部分
+
     def _create_index_page(self, novels):
         """
-        インデックスページを作成
+        インデックスページを作成（最近読んだ小説セクション付き）
 
         Args:
             novels (list): 小説のリスト
@@ -451,6 +453,15 @@ self.addEventListener('activate', event => {{
                     <input type="text" class="search-box" placeholder="小説を検索...">
                 </div>
 
+                <!-- 最近読んだ小説セクション -->
+                <div class="recent-novels-section">
+                    <h2>最近読んだ小説</h2>
+                    <div class="recent-novels-list">
+                        <!-- JavaScriptで動的に読み込み -->
+                    </div>
+                </div>
+
+                <h2>全小説一覧</h2>
                 <div class="novel-list">
         """
 
@@ -459,20 +470,20 @@ self.addEventListener('activate', event => {{
             ncode = novel[0]
             title = novel[1] if novel[1] else "無題の小説"
             author = novel[2] if novel[2] else "著者不明"
-            synopsis = novel[3] if novel[3] else "更新日不明"
+            updated_at = novel[3] if novel[3] else "更新日不明"
             episodes = novel[5] if len(novel) > 5 and novel[5] is not None else 0
-            updated_at = novel[7] if len(novel) > 7 and novel[7] else "あらすじはありません"
+            synopsis = novel[7] if len(novel) > 7 and novel[7] else "あらすじはありません"
 
             # あらすじの短縮
             if len(synopsis) > 150:
                 synopsis = synopsis[:150] + "..."
 
             html_content += f"""
-            <div class="novel-card">
+            <div class="novel-card" data-novel-id="{ncode}">
                 <h3><a href="novels/{ncode}/index.html">{title}</a></h3>
                 <div class="novel-info">作者: {author} | エピソード数: {episodes}</div>
-                <div class="novel-info">更新: {updated_at}</div>
-                <div class="novel-synopsis">{synopsis}</div>
+                <div class="novel-info">更新: {synopsis}</div>
+                <div class="novel-synopsis">{updated_at}</div>
             </div>
             """
 
@@ -511,9 +522,11 @@ self.addEventListener('activate', event => {{
 
         logger.info(f"インデックスページを作成しました: {index_path}")
 
+    # _create_novel_pageメソッドの修正部分
+
     def _create_novel_page(self, novel_dir, novel, episodes):
         """
-        小説情報ページを作成
+        小説情報ページを作成（続きから読むボタン対応）
 
         Args:
             novel_dir (Path): 小説ディレクトリのパス
@@ -523,8 +536,8 @@ self.addEventListener('activate', event => {{
         ncode = novel[0]
         title = novel[1] if novel[1] else "無題の小説"
         author = novel[2] if novel[2] else "著者不明"
-        synopsis = novel[3] if novel[3] else "あらすじはありません"
-        updated_at = novel[7] if len(novel) > 7 and novel[7] else "更新日不明"
+        synopsis = novel[7] if len(novel) > 7 and novel[7] else "あらすじはありません"
+        updated_at = novel[3] if novel[3] else "更新日不明"
 
         # 目次を作成
         episodes_html = ""
@@ -552,29 +565,30 @@ self.addEventListener('activate', event => {{
                     <h1>{title}</h1>
                 </div>
             </header>
-            
+
             <main class="container">
                 <a href="../../index.html" class="back-link">← 小説一覧に戻る</a>
-                
+
                 <div class="novel-meta">
                     <h2>{title}</h2>
                     <p>作者: {author}</p>
-                    <p>最終更新: {updated_at}</p>
+                    <p>最終更新: {synopsis}</p>
                     <p>エピソード数: {len(episodes)}</p>
                     <h3>あらすじ</h3>
-                    <p>{synopsis}</p>
+                    <p>{updated_at}</p>
+                    <!-- 続きから読むボタンがここに動的に挿入されます -->
                 </div>
-                
+
                 <div class="search-container">
                     <input type="text" class="search-box" placeholder="エピソードを検索...">
                 </div>
-                
+
                 <h3>目次</h3>
                 <ul class="episode-list">
                     {episodes_html}
                 </ul>
             </main>
-            
+
             <button class="back-to-top">↑</button>
         </body>
         </html>
@@ -587,9 +601,11 @@ self.addEventListener('activate', event => {{
 
         logger.info(f"小説情報ページを作成しました: {index_path}")
 
+    # _create_episode_pageメソッドの修正部分
+
     def _create_episode_page(self, novel_dir, novel, episode, all_episodes):
         """
-        エピソードページを作成
+        エピソードページを作成（閲覧履歴保存対応）
 
         Args:
             novel_dir (Path): 小説ディレクトリのパス
@@ -658,7 +674,7 @@ self.addEventListener('activate', event => {{
                     <option value="sepia-theme">セピア</option>
                 </select>
             </div>
-            
+
             <div class="settings-group">
                 <h3>フォント</h3>
                 <select id="font-selector" class="font-selector">
@@ -669,7 +685,7 @@ self.addEventListener('activate', event => {{
                     <option value="'Yu Gothic', sans-serif">游ゴシック</option>
                 </select>
             </div>
-            
+
             <div class="settings-group">
                 <h3>行間</h3>
                 <input type="range" id="line-height-slider" class="line-height-slider" min="1.2" max="2.4" step="0.1" value="1.8">
@@ -693,27 +709,27 @@ self.addEventListener('activate', event => {{
                     <h2>第{episode_no}話: {episode_title}</h2>
                 </div>
             </header>
-            
+
             <main class="container">
                 <a href="index.html" class="back-link">← 目次に戻る</a>
-                
+
                 <div class="episode-content">
                     {processed_body}
                 </div>
-                
+
                 <div class="episode-nav">
                     {prev_link}
                     {next_link}
                 </div>
             </main>
-            
+
             {settings_panel}
-            
+
             <div class="font-size-controls">
                 <button id="decrease-font" class="font-button">A-</button>
                 <button id="increase-font" class="font-button">A+</button>
             </div>
-            
+
             <button class="back-to-top">↑</button>
         </body>
         </html>
