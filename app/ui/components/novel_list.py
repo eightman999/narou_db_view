@@ -1,5 +1,5 @@
 """
-小説一覧を表示するUIコンポーネント
+小説一覧を表示するUIコンポーネント（ソート機能付き）
 """
 import threading
 import tkinter as tk
@@ -36,6 +36,8 @@ class NovelListView(ttk.Frame):
         self.total_pages = 0
         self.novels = []
         self.search_text = ""
+        self.sort_key = "updated_at"  # デフォルトのソート基準
+        self.sort_order = True  # True: 降順, False: 昇順
 
         # UIコンポーネント
         self.scroll_canvas = None
@@ -45,6 +47,7 @@ class NovelListView(ttk.Frame):
         self.next_button = None
         self.list_display_frame = None
         self.search_entry = None
+        self.sort_combobox = None  # 追加：ソートプルダウン
 
         # UIの初期化
         self.init_ui()
@@ -66,6 +69,32 @@ class NovelListView(ttk.Frame):
 
         clear_button = ttk.Button(search_frame, text="クリア", command=self.clear_search)
         clear_button.pack(side="left", padx=5)
+
+        # ソートドロップダウン（新規追加）
+        sort_frame = ttk.Frame(self)
+        sort_frame.pack(fill="x", pady=(0, 5), padx=5)
+
+        ttk.Label(sort_frame, text="並び替え:").pack(side="left", padx=5)
+
+        # ソートオプション
+        self.sort_options = [
+            "更新日時 降順",
+            "更新日時 昇順",
+            "Nコード 昇順",
+            "Nコード 降順",
+            "タイトル 昇順",
+            "タイトル 降順",
+            "総話数 降順",
+            "総話数 昇順"
+        ]
+
+        self.sort_var = tk.StringVar()
+        self.sort_var.set(self.sort_options[0])  # デフォルト値
+
+        self.sort_combobox = ttk.Combobox(sort_frame, textvariable=self.sort_var,
+                                          values=self.sort_options, state="readonly", width=15)
+        self.sort_combobox.pack(side="left", padx=5)
+        self.sort_combobox.bind("<<ComboboxSelected>>", self.sort_novels)
 
         # キャンバスとスクロールバー
         self.scroll_canvas = tk.Canvas(self, bg="#F0F0F0")
@@ -175,8 +204,8 @@ class NovelListView(ttk.Frame):
             if self.search_text:
                 self.novels = [n for n in self.novels if self.filter_novel(n, self.search_text)]
 
-            # 更新日時でソート
-            self.novels.sort(key=lambda n: n[3] if n[3] else "", reverse=True)
+            # 選択されたソート条件に従ってソート
+            self.sort_novels_data()
 
             # 総ページ数を計算
             self.total_pages = (len(self.novels) + self.items_per_page - 1) // self.items_per_page
@@ -188,6 +217,65 @@ class NovelListView(ttk.Frame):
             logger.error(f"小説データの読み込みエラー: {e}")
             # エラー表示
             self.after(0, lambda: self.show_error(f"小説データの読み込みに失敗しました: {e}"))
+
+    def sort_novels(self, event=None):
+        """ソート変更時の処理"""
+        # 現在選択されているソートオプションを取得
+        selected_option = self.sort_var.get()
+
+        # ソートオプションに基づいて、ソートキーと順序を設定
+        if "更新日時" in selected_option:
+            self.sort_key = "updated_at"
+        elif "Nコード" in selected_option:
+            self.sort_key = "n_code"
+        elif "タイトル" in selected_option:
+            self.sort_key = "title"
+        elif "総話数" in selected_option:
+            self.sort_key = "total_ep"
+
+        # 昇順・降順の設定
+        self.sort_order = "降順" in selected_option
+
+        # データを再読み込み
+        self.show_novels()
+
+    def sort_novels_data(self):
+        """選択されたソート条件に従って小説リストをソート"""
+        try:
+            # ソートキーに基づいて、インデックスを決定
+            if self.sort_key == "updated_at":
+                key_index = 3  # updated_at のインデックス
+            elif self.sort_key == "n_code":
+                key_index = 0  # n_code のインデックス
+            elif self.sort_key == "title":
+                key_index = 1  # title のインデックス
+            elif self.sort_key == "total_ep":
+                key_index = 5  # total_ep のインデックス（もしくは使用しているものに合わせる）
+            else:
+                key_index = 3  # デフォルトは更新日時
+
+            # ソート実行
+            def sort_key(novel):
+                value = novel[key_index] if key_index < len(novel) else None
+
+                # 数値型の場合は数値に変換してソート
+                if self.sort_key == "total_ep" and value is not None:
+                    try:
+                        return int(value) if value else 0
+                    except (ValueError, TypeError):
+                        return 0
+
+                # 文字列の場合
+                if value is None:
+                    return "" if self.sort_key == "n_code" or self.sort_key == "title" else "0000-00-00"
+
+                return value
+
+            # ソート実行（昇順・降順に合わせる）
+            self.novels.sort(key=sort_key, reverse=self.sort_order)
+
+        except Exception as e:
+            logger.error(f"小説のソート中にエラーが発生しました: {e}")
 
     def load_page(self, page_num):
         """指定ページの小説を表示"""
