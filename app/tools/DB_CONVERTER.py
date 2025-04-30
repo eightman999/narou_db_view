@@ -5,10 +5,13 @@ def migrate_novels_descs_schema(db_path):
     cursor = conn.cursor()
 
     try:
+        # 既存のnovels_descs_oldテーブルを削除
+        cursor.execute("DROP TABLE IF EXISTS novels_descs_old;")
+
         # 1. 一時テーブルにデータをバックアップ
         cursor.execute("ALTER TABLE novels_descs RENAME TO novels_descs_old;")
 
-        # 2. 新しいスキーマでテーブルを作成（Expectedの構造に合わせる）
+        # 2. 新しいスキーマでテーブルを作成
         cursor.execute('''
             CREATE TABLE novels_descs (
                 n_code TEXT PRIMARY KEY NOT NULL DEFAULT 'undefined',
@@ -61,4 +64,4 @@ def migrate_novels_descs_schema(db_path):
         conn.close()
 
 # 使用例
-migrate_novels_descs_schema("your_database_path.sqlite")
+migrate_novels_descs_schema("novel_status.db")

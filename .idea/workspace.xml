@@ -5,7 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="bad1a08a-9700-4753-8d26-2a6749864910" name="変更" comment="っっl">
-      <change beforePath="$PROJECT_DIR$/app/ui/components/novel_list.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/ui/components/novel_list.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/database/db_files/novel_status.db-shm" beforeDir="false" afterPath="$PROJECT_DIR$/app/database/db_files/novel_status.db-shm" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/database/db_files/novel_status.db-wal" beforeDir="false" afterPath="$PROJECT_DIR$/app/database/db_files/novel_status.db-wal" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/tools/DB_CONVERTER.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/tools/DB_CONVERTER.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -50,6 +53,7 @@
     &quot;PowerShell.script.ps1.executor&quot;: &quot;Run&quot;,
     &quot;Python.98.executor&quot;: &quot;Run&quot;,
     &quot;Python.AsyncConnection.executor&quot;: &quot;Run&quot;,
+    &quot;Python.DB_CONVERTER.executor&quot;: &quot;Run&quot;,
     &quot;Python.Del_Duplication.executor&quot;: &quot;Run&quot;,
     &quot;Python.F_index.executor&quot;: &quot;Run&quot;,
     &quot;Python.Recover_novel.executor&quot;: &quot;Run&quot;,
@@ -93,7 +97,7 @@
     &quot;project.structure.last.edited&quot;: &quot;プロジェクト&quot;,
     &quot;project.structure.proportion&quot;: &quot;0.15&quot;,
     &quot;project.structure.side.proportion&quot;: &quot;0.0&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;reference.settingsdialog.project.grazie&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
     &quot;show.migrate.to.gradle.popup&quot;: &quot;false&quot;,
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;,
     &quot;アプリケーション.main_view.executor&quot;: &quot;Run&quot;
@@ -114,7 +118,7 @@
       <recent name="D:\趣味\narou_db_view\app" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.main (1)">
+  <component name="RunManager">
     <configuration name="F_index" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="narou_db_formatter" />
       <option name="ENV_FILES" value="" />
@@ -209,8 +213,8 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.main (1)" />
         <item itemvalue="Python.export_gui (1)" />
+        <item itemvalue="Python.main (1)" />
         <item itemvalue="Python.html_exporter" />
         <item itemvalue="Python.F_index" />
       </list>
@@ -276,6 +280,8 @@
       <workItem from="1745318552361" duration="1878000" />
       <workItem from="1745583588242" duration="461000" />
       <workItem from="1745930002106" duration="1214000" />
+      <workItem from="1746009358659" duration="970000" />
+      <workItem from="1746010670276" duration="492000" />
     </task>
     <task id="LOCAL-00001" summary="っっl">
       <option name="closed" value="true" />
@@ -318,10 +324,11 @@
     <SUITE FILE_PATH="coverage/narou_db_formatter$delete_two_tag.coverage" NAME="delete_two_tag のカバレッジ結果" MODIFIED="1733821143452" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_view$first_formatter.coverage" NAME="first_formatter のカバレッジ結果" MODIFIED="1740914352973" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_view$main_view_async.coverage" NAME="main_view_async のカバレッジ結果" MODIFIED="1743684144726" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/narou_db_view$main__1_.coverage" NAME="main (1) のカバレッジ結果" MODIFIED="1745931001610" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/app" />
+    <SUITE FILE_PATH="coverage/narou_db_view$main__1_.coverage" NAME="main (1) のカバレッジ結果" MODIFIED="1746009382403" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/app" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$main_view.coverage" NAME="main_view のカバレッジ結果" MODIFIED="1740473074596" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_view$AsyncConnection.coverage" NAME="AsyncConnection のカバレッジ結果" MODIFIED="1743682582024" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$checker.coverage" NAME="checker のカバレッジ結果" MODIFIED="1740469049707" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/narou_db_view$DB_CONVERTER.coverage" NAME="DB_CONVERTER のカバレッジ結果" MODIFIED="1746010765115" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/app/tools" />
     <SUITE FILE_PATH="coverage/narou_db_view$first_last_update.coverage" NAME="first_last_update のカバレッジ結果" MODIFIED="1740917915165" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$98.coverage" NAME="98 のカバレッジ結果" MODIFIED="1734490118271" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_view$async_checker.coverage" NAME="async_checker のカバレッジ結果" MODIFIED="1740908263989" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
@@ -338,7 +345,7 @@
     <SUITE FILE_PATH="coverage/narou_db_view$export_gui.coverage" NAME="export_gui のカバレッジ結果" MODIFIED="1745127859571" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/app/utils/exporters" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$makeEPUB.coverage" NAME="makeEPUB のカバレッジ結果" MODIFIED="1734875569290" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$ep_no_fomatter.coverage" NAME="ep_no_fomatter のカバレッジ結果" MODIFIED="1733837104868" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/narou_db_view$export_gui__1_.coverage" NAME="export_gui (1) のカバレッジ結果" MODIFIED="1745127869915" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/app/export_tools" />
+    <SUITE FILE_PATH="coverage/narou_db_view$export_gui__1_.coverage" NAME="export_gui (1) のカバレッジ結果" MODIFIED="1746010699934" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/app/export_tools" />
     <SUITE FILE_PATH="coverage/narou_db_formatter$existence_checker.coverage" NAME="existence_checker のカバレッジ結果" MODIFIED="1740465795719" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/narou_db_view$main.coverage" NAME="main のカバレッジ結果" MODIFIED="1743941824676" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core" />
   </component>
