@@ -37,7 +37,7 @@ def add_update_check_indices():
 
         # 最後に読んだ小説テーブルのインデックス
         cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_last_read ON rast_read_novel (
+        CREATE INDEX IF NOT EXISTS idx_last_read ON last_read_novel (
             ncode,
             date
         );

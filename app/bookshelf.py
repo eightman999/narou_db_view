@@ -43,15 +43,15 @@ def shelf_maker():
     return sub_shelf
 
 
-def input_last_read(rast_read_novel, episode_no):
+def input_last_read(last_read_novel, episode_no):
     """
     最後に読んだ小説とエピソード番号を記録する
 
     Args:
-        rast_read_novel (str): 小説コード
+        last_read_novel (str): 小説コード
         episode_no (int): エピソード番号
     """
-    db.update_last_read(rast_read_novel, episode_no)
+    db.update_last_read(last_read_novel, episode_no)
 
 
 def get_last_read(shelf):

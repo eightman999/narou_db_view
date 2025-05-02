@@ -462,7 +462,7 @@ class DatabaseHandler:
         """
         query = '''
         SELECT ncode, episode_no
-        FROM rast_read_novel
+        FROM last_read_novel
         ORDER BY date DESC
         LIMIT 1
         '''
@@ -478,7 +478,7 @@ class DatabaseHandler:
         """
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         query = '''
-        INSERT INTO rast_read_novel (ncode, date, episode_no)
+        INSERT INTO last_read_novel (ncode, date, episode_no)
         VALUES (?, ?, ?)
         '''
         # 非同期で処理（UIをブロックしない）
