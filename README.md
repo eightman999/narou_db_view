@@ -1,22 +1,21 @@
-## 概要
-「なろう小説」のデータベース管理および閲覧用のアプリケーションです。
+# narou_db_view — RETIRED
 
-## 機能
-- 小説データの取得と管理
-- エピソードの一覧表示と閲覧
-- 更新された小説の追跡
-- データクリーンアップと復元ツール
+> **Status: retired (2026-09-09).**
+>
+> 「なろう小説」DBの管理・閲覧を試した旧アプリケーションです。新規開発は終了し、役割は現在の `eightman999/Novel_reader_app` に統合されています。
 
-## ディレクトリ構造
-- `app/`: アプリケーションのメインコード
-  - `core/`: コア機能（データ管理、更新処理など）
-  - `ui/`: ユーザーインターフェース
-    - `components/`: UI部品
-- `config/`: 設定ファイル
-- `database/`: データベース関連
-- `tools/`: ユーティリティツール
-  - `data_cleanup/`: データクリーンアップ機能
-  - `recovery/`: データ復旧機能
-- `utils/`: 共通ユーティリティ
-  - `exporters/`: エクスポート機能
-  - `web/`: Web関連機能
+## Distilled lessons
+
+旧DB viewer / builder群から残すべきデータ保全則は以下へ蒸留しました。
+
+- `eightman999/Novel_reader_app/docs/legacy-narou-distillation-2026-09-09.md`
+
+特に次を現行側の不変条件として残しています。
+
+- remote総話数はlocal完全性の証明ではない
+- `MAX(episode_no)` だけで途中欠番を見逃さない
+- fetch failure / not found / restrictedを同一状態に潰さない
+- source由来データの再取得でfavorite / last-read / progressを消さない
+- 通常updateとrepairを区別する
+
+コードと履歴はhistorical prototypeとして残しますが、仕様・実装の正典ではありません。
